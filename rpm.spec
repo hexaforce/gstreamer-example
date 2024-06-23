@@ -1,11 +1,10 @@
-%define _topdir /gstreamer-example
+%define _topdir /home/relics9/gstreamer-example
 
 Name: gstreamer-example
 Version: 1.0
 Release: 1
 Summary: A simple example using GStreamer
 License: MIT
-Source0: gstreamer-example.tar.gz
 
 %description
 This package provides a simple example application using GStreamer.
@@ -15,4 +14,16 @@ This package provides a simple example application using GStreamer.
 - Initial RPM package release
 
 %build
-make
+cp -r ../src .
+cp ../Makefile .
+cp ../CMakeLists.txt .
+make %{?_smp_mflags}
+
+%install
+rm -rf %{buildroot}
+mkdir -p %{buildroot}/usr/bin
+cp -a build/GStreamerExample %{buildroot}/usr/bin/
+
+%files
+%defattr(-,root,root,-)
+/usr/bin/GStreamerExample
