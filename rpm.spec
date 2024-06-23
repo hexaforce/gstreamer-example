@@ -1,46 +1,14 @@
-%define _topdir /root/rpmbuild
-%define name gstreamer-example
-%define version 1.0
-%define release 1%{?dist}
-%define source_dir %{_topdir}/SOURCES
-%define buildroot %{_topdir}/BUILDROOT/%{name}-%{version}-%{release}
+%define _topdir /gstreamer-example
 
-Name:           %{name}
-Version:        %{version}
-Release:        %{release}
-Summary:        A simple example using GStreamer
-
-License:        GPL
-URL:            https://example.com/gstreamer-example
-
-BuildRequires:  cmake
-BuildRequires:  gcc-c++
-BuildRequires:  gstreamer1-devel
-BuildRequires:  gstreamer1-plugins-good
-BuildRequires:  gstreamer1-plugins-bad-free
-BuildRequires:  gstreamer1-libav
+Name: gstreamer-example
+Version: 1.0
+Release: 1
+Summary: A simple example using GStreamer
+License: MIT
 
 %description
 This package provides a simple example application using GStreamer.
 
-%prep
-%autosetup -p1 -n %{name}-%{version}
-
-%build
-mkdir -p build
-cd build
-cmake ..
-make
-
-%install
-rm -rf %{buildroot}
-mkdir -p %{buildroot}/%{_bindir}
-cp -p build/gstreamer-example %{buildroot}/%{_bindir}/
-
-%files
-%license LICENSE
-%{_bindir}/gstreamer-example
-
 %changelog
-* Fri Jun 24 2024 Your Name <your.email@example.com> - 1.0-1
+* Tue Jun 25 2024 Your Name <your.email@example.com> - 1.0-1
 - Initial RPM package release

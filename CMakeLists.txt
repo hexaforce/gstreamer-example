@@ -12,19 +12,19 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
 
 # 実行可能ファイルの生成とソースファイルのリスト
-add_executable(gstreamerapp src/main.cpp)
+add_executable(GStreamerExample src/main.cpp)
 
 # インクルードディレクトリとリンクするライブラリの設定
-target_include_directories(gstreamerapp PRIVATE ${GSTREAMER_INCLUDE_DIRS})
+target_include_directories(GStreamerExample PRIVATE ${GSTREAMER_INCLUDE_DIRS})
 
 # プラットフォームごとのライブラリパスとリンク設定
 if(APPLE)
     # macOSの場合のライブラリパスとリンク設定
-    target_link_directories(gstreamerapp PRIVATE /usr/local/lib)
+    target_link_directories(GStreamerExample PRIVATE /usr/local/lib)
 elseif(UNIX)  # 他のUnix系OS（Linuxを含む）
     # Linuxの場合のライブラリパスとリンク設定
-    target_link_directories(gstreamerapp PRIVATE /usr/lib/x86_64-linux-gnu)
+    target_link_directories(GStreamerExample PRIVATE /usr/lib/x86_64-linux-gnu)
 endif()
 
 # ライブラリのリンク
-target_link_libraries(gstreamerapp PRIVATE ${GSTREAMER_LIBRARIES})
+target_link_libraries(GStreamerExample PRIVATE ${GSTREAMER_LIBRARIES})
