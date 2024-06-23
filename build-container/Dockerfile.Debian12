@@ -1,0 +1,65 @@
+# Dockerfile for building .deb package using Debian 12 (Bookworm) container
+
+# Use Debian 12 (Bookworm) base image
+FROM debian:bookworm
+
+# Install necessary packages for building .deb package
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    fakeroot \
+    debhelper \
+    pkg-config 
+
+    RUN apt-get install devscripts vim
+    RUN apt-get install -y \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav
+
+# # Copy your source code and Debian package files to the container
+# COPY debian /opt/myproject/debian
+# COPY src /opt/myproject/src
+# COPY CMakeLists.txt /opt/myproject/CMakeLists.txt
+
+# # Set working directory
+# WORKDIR /opt/myproject
+
+# # Generate Makefiles and build the project
+# RUN mkdir build && cd build && \
+#     cmake .. && \
+#     make -j$(nproc)
+
+# # Build .deb package using debuild
+# RUN cd /opt/myproject && \
+#     debuild -us -uc
+
+# # Example: If your project creates a .deb package, copy it to a directory
+# # where you can access it from the host machine
+# RUN cp /opt/myproject/*.deb /output/
+
+# # Clean up unnecessary packages and files to reduce image size
+# RUN apt-get remove -y \
+#     build-essential \
+#     cmake \
+#     fakeroot \
+#     debhelper \
+#     pkg-config \
+#     libgstreamer1.0-dev \
+#     gstreamer1.0-plugins-base-dev \
+#     gstreamer1.0-plugins-good \
+#     gstreamer1.0-plugins-bad \
+#     gstreamer1.0-plugins-ugly \
+#     gstreamer1.0-libav && \
+#     apt-get autoremove -y && \
+#     apt-get clean && \
+#     rm -rf /var/lib/apt/lists/* /opt/myproject
+
+# # Define a volume for the output directory
+# VOLUME /output
+
+# Specify the command to run when the container starts
+CMD ["bash"]

@@ -20,6 +20,13 @@ clean:
 	@echo "Cleaning up..."
 	@rm -rf $(BUILD_DIR)
 
+# RPMパッケージのビルド
+.PHONY: rpm
+rpm:
+	@echo "Building RPM package..."
+	@rm -rf BUILD BUILDROOT RPMS SRPMS  # RPMビルド前にクリーンアップ
+	@rpmbuild -ba rpm.spec
+
 # ヘルプメッセージ
 .PHONY: help
 help:
@@ -27,5 +34,6 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  all      : Build the project (default target)"
+	@echo "  rpm      : Build RPM package"
 	@echo "  clean    : Clean up built files"
 	@echo "  help     : Show this help message"

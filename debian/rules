@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# Custom build commands
+	make
+
+override_dh_auto_install:
+	# Custom install commands
+	dh_auto_install
+	# Install your executable
+	install -D -m 0755 build/GStreamerExample $(DESTDIR)/usr/bin/GStreamerExample
