@@ -1,4 +1,4 @@
-%define _topdir /home/relics9/gstreamer-example
+%define _topdir /gstreamer-example
 
 Name: gstreamer-example
 Version: 1.0

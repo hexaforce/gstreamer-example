@@ -27,13 +27,7 @@ rpm:
 	@rm -rf BUILD BUILDROOT RPMS SRPMS  # RPMビルド前にクリーンアップ
 	@rpmbuild -ba rpm.spec
 
-# ヘルプメッセージ
-.PHONY: help
-help:
-	@echo "Usage: make [target]"
-	@echo ""
-	@echo "Targets:"
-	@echo "  all      : Build the project (default target)"
-	@echo "  rpm      : Build RPM package"
-	@echo "  clean    : Clean up built files"
-	@echo "  help     : Show this help message"
+# Debianパッケージのビルド
+.PHONY: deb
+deb:
+	@echo "Building Debian package.

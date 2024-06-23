@@ -7,7 +7,7 @@ FROM fedora:40
 WORKDIR /gstreamer-example
 
 # Install necessary build tools
-RUN dnf update && dnf install -y rpm-build rpmdevtools gcc cmake make pkgconfig
+RUN dnf update -y && dnf install -y rpm-build rpmdevtools gcc g++ cmake make pkgconfig
 
 # Install GStreamer development packages
 RUN dnf install -y \

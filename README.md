@@ -1,9 +1,15 @@
 # gstreamer-example
 
 ```bash
-docker build --file Dockerfile.Debian12 .
-docker build --file Dockerfile.Fedora40 .
+docker build --file Dockerfile.Debian12 --tag debian/build
+docker build --file Dockerfile.Fedora40 --tag fedora/build
 ```
+
+
+cat /etc/os-release
+
+docker run --rm -it -v ./:/gstreamer-example 37909784a722 bash
+docker run --rm -it -v ./:/gstreamer-example 3364c3d7d36e bash
 
 
 
