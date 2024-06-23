@@ -1,5 +1,3 @@
-# RPM Package Specification File for gstreamer-example
-
 %define _topdir /root/rpmbuild
 %define name gstreamer-example
 %define version 1.0
@@ -14,12 +12,10 @@ Summary:        A simple example using GStreamer
 
 License:        GPL
 URL:            https://example.com/gstreamer-example
-Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  cmake
 BuildRequires:  gcc-c++
 BuildRequires:  gstreamer1-devel
-BuildRequires:  gstreamer1-plugins-base-devel
 BuildRequires:  gstreamer1-plugins-good
 BuildRequires:  gstreamer1-plugins-bad-free
 BuildRequires:  gstreamer1-libav
@@ -31,12 +27,15 @@ This package provides a simple example application using GStreamer.
 %autosetup -p1 -n %{name}-%{version}
 
 %build
-make %{?_smp_mflags}
+mkdir -p build
+cd build
+cmake ..
+make
 
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}/%{_bindir}
-cp -p src/build/gstreamer-example %{buildroot}/%{_bindir}/
+cp -p build/gstreamer-example %{buildroot}/%{_bindir}/
 
 %files
 %license LICENSE
