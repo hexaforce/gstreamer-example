@@ -30,4 +30,18 @@ rpm:
 # Debianパッケージのビルド
 .PHONY: deb
 deb:
-	@echo "Building Debian package.
+	@echo "Building Debian package..."
+	@rm -rf $(BUILD_DIR)
+	@debuild -us -uc
+
+# ヘルプメッセージ
+.PHONY: help
+help:
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Targets:"
+	@echo "  all      : Build the project (default target)"
+	@echo "  rpm      : Build RPM package"
+	@echo "  deb      : Build Debian package"
+	@echo "  clean    : Clean up built files"
+	@echo "  help     : Show this help message"

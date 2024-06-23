@@ -1,0 +1,6 @@
+.debhelper/
+gstreamer-example/
+files
+*.log
+*.substvars
+*-stamp
