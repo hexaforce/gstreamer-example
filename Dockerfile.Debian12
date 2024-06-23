@@ -1,0 +1,29 @@
+# Dockerfile for building .deb package using Debian 12 (Bookworm) container
+
+# Use Debian 12 (Bookworm) base image
+FROM debian:12
+
+# Set working directory
+WORKDIR /gstreamer-example
+
+# Install necessary packages for building .deb package
+RUN apt-get update && apt-get install -y \
+    devscripts \                
+    vim \                       
+    build-essential \           
+    cmake \                     
+    fakeroot \                  
+    debhelper \                 
+    pkg-config 
+
+# Install GStreamer development packages
+RUN apt-get install -y \
+    libgstreamer1.0-dev \               
+    libgstreamer-plugins-base1.0-dev \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav
+
+# Set default command to run 'make' (assumes Makefile exists)
+CMD ["make", "deb"]

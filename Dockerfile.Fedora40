@@ -1,0 +1,21 @@
+# Dockerfile for building RPM package using Fedora 40 container
+
+# Use Fedora 40 base image
+FROM fedora:40
+
+# Set working directory
+WORKDIR /gstreamer-example
+
+# Install necessary build tools
+RUN dnf update && dnf install -y rpm-build rpmdevtools gcc cmake make pkgconfig
+
+# Install GStreamer development packages
+RUN dnf install -y \
+    gstreamer1-devel \  
+    gstreamer1-plugins-base-devel \
+    gstreamer1-plugins-good \
+    gstreamer1-plugins-bad-free \
+    gstreamer1-libav
+
+# Set default command to run 'make' (assumes Makefile exists)
+CMD ["make", "rpm"]

@@ -1,4 +1,12 @@
 # gstreamer-example
+
+```bash
+docker build --file Dockerfile.Debian12 .
+docker build --file Dockerfile.Fedora40 .
+```
+
+
+
 rm -f debian/changelog
 
 export DEBEMAIL="your.email@example.com"
