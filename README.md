@@ -1,8 +1,8 @@
 # gstreamer-example
 
 ```bash
-docker build --file Dockerfile.Debian12 --tag debian/build
-docker build --file Dockerfile.Fedora40 --tag fedora/build
+docker buildx build --file Dockerfile.Debian12 --tag hexaforce/deb-build .
+docker buildx build --file Dockerfile.Fedora40 --tag hexaforce/rpm-build .
 ```
 
 
