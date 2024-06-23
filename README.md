@@ -1,9 +1,10 @@
 # gstreamer-example
-dch --create --package gstreamer-example --newversion 1.0-1 --distribution unstable
+rm -f debian/changelog
 
-
-
-
+export DEBEMAIL="your.email@example.com"
+rm -f debian/changelog
+dch --create --package gstreamer-example --newversion 1.0-1 --distribution unstable -b ""
+dch warning: ignoring -a/-i/-e/-r/-b/--allow-lower-version/-n/--bin-nmu/-q/--qa/-R/-s/--lts/--team/--bpo/--stable,-l options with --create
 
 
 rm -rf ~/rpmbuild
