@@ -9,9 +9,12 @@ RUN apt-get update && apt-get install -y \
     cmake \
     fakeroot \
     debhelper \
-    pkg-config \
+    pkg-config 
+
+    RUN apt-get install devscripts vim
+    RUN apt-get install -y \
     libgstreamer1.0-dev \
-    gstreamer1.0-plugins-base-dev \
+    libgstreamer-plugins-base1.0-dev \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-plugins-ugly \

@@ -1,0 +1,13 @@
+Source: gstreamer-example
+Section: misc
+Priority: optional
+Maintainer: Your Name <your.email@example.com>
+Build-Depends: debhelper-compat (= 13), g++
+Standards-Version: 4.6.0
+Homepage: http://www.example.com
+
+Package: gstreamer-example
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: A simple hello world application
+ This is a simple hello world application written in C++.

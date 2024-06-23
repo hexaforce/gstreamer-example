@@ -1,4 +1,11 @@
 # gstreamer-example
+dch --create --package gstreamer-example --newversion 1.0-1 --distribution unstable
+
+
+
+
+
+
 rm -rf ~/rpmbuild
 rpmdev-setuptree
 
