@@ -16,9 +16,6 @@ int main(int argc, char *argv[])
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
 
     // メインループ
-    // bus = gst_element_get_bus(pipeline);
-    // msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_ERROR | GST_MESSAGE_EOS);
-    // メインループ
     bus = gst_element_get_bus(pipeline);
     msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
 
