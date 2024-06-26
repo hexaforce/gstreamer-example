@@ -1,1 +1,0 @@
-gst-launch-1.0 -v udpsrc port=5600 ! h264parse  ! decodebin ! videoconvert ! autovideosink
