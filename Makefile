@@ -10,10 +10,8 @@ BUILD_DIR := build
 .PHONY: all
 all:
 	@echo "Building project..."
-	@cd RTPStreaming
-	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && cmake ..
-	@cd $(BUILD_DIR) && make -j$(shell nproc)
+	@mkdir -p RTPStreaming/$(BUILD_DIR)
+	cd RTPStreaming/$(BUILD_DIR) && cmake .. && make -j$(shell nproc)
 
 # クリーンアップ
 .PHONY: clean
