@@ -3,10 +3,11 @@ version: '3'
 services:
   # uncomment the sendrecv you would like to use
   #
-  sendrecv-gst:
-    build: ./gst
-    depends_on:
-      - signalling
+  # sendrecv-gst:
+  #   build: ./gst
+  #   restart: always
+  #   depends_on:
+  #     - signalling
   # sendrecv-gst-java:
   #   build: ./sendrecv/gst-java
   #sendrecv-gst-rust:
