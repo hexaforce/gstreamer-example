@@ -3,3 +3,5 @@ BUILD/
 RPMS/
 SRPMS/
 BUILDROOT/
+gst/webrtc-sendrecv
+.vscode/

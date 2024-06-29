@@ -1,0 +1,13 @@
+BasedOnStyle: Google
+IndentWidth: 4
+ColumnLimit: 256
+AllowShortIfStatementsOnASingleLine: false
+BreakBeforeBraces: Allman
+SpacesBeforeTrailingComments: 1
+Cpp11BracedListStyle: true
+
+
+# Add custom style options
+AlignConsecutiveDeclarations: true
+AlignConsecutiveAssignments: true
+AlignTrailingComments: true
