@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+  # uncomment the sendrecv you would like to use
+  #
+  sendrecv-gst:
+    build: ./gst
+    depends_on:
+      - signalling
+  # sendrecv-gst-java:
+  #   build: ./sendrecv/gst-java
+  #sendrecv-gst-rust:
+  #  build: ./sendrecv/gst-rust
+  sendrecv-js:
+    build: ./js
+    ports:
+      - 8080:80
+    depends_on:
+      - signalling
+  signalling:
+    build: ./signalling
+    ports:
+      - 8443:8443
