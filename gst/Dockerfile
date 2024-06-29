@@ -18,7 +18,7 @@ RUN make
 CMD echo "Waiting a few seconds for you to open the browser at localhost:8080" \
     && sleep 10 \
     && ./webrtc-sendrecv \
-    --peer-id=5053 \
+    --peer-id=5744 \
     --server=wss://webrtc.nirbheek.in:8443 \
     --disable-ssl
 
