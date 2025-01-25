@@ -13,7 +13,7 @@ brew install libsoup@2
 
 ### 受信のみ
 * webrtc-recvonly-h264
-![webrtc-recvonly-h264](webrtc-recvonly-h264.png)
+![webrtc-recvonly-h264](img/webrtc-recvonly-h264.png)
 ```shell
 $ ./webrtc-recvonly-h264
 WebRTC page link: http://127.0.0.1:57778/
@@ -21,7 +21,7 @@ WebRTC page link: http://127.0.0.1:57778/
 
 ### 送信のみ
 * webrtc-unidirectional-h264
-![webrtc-unidirectional-h264](webrtc-unidirectional-h264.png)
+![webrtc-unidirectional-h264](img/webrtc-unidirectional-h264.png)
 送受信
 ```shell
 $ ./webrtc-unidirectional-h264
@@ -30,7 +30,7 @@ WebRTC page link: http://127.0.0.1:57778/
 
 ### 送受信
 * webrtc-sendrecv
-![webrtc-sendrecv](webrtc-sendrecv.png)
+![webrtc-sendrecv](img/webrtc-sendrecv.png)
 
 上記のコードではWebとシグナリングサーバが1つになっていますが、  
 このケースではWebとシグナリングサーバを立ち上げる必要があります  
