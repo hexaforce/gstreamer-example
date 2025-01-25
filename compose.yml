@@ -1,0 +1,20 @@
+services:
+  web:
+    build: ./web
+    ports:
+      - 80:80
+    volumes:
+      - ./web:/usr/share/nginx/html
+    depends_on:
+      - signaling
+
+  java-sendrecv:
+    build: ./java-sendrecv
+    command: tail -f /dev/null
+    depends_on:
+      - signaling
+
+  signaling:
+    build: ./signaling
+    ports:
+      - 8443:8443

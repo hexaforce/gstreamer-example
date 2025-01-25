@@ -1,0 +1,444 @@
+<!doctype html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      .error {
+        color: red;
+      }
+    </style>
+    <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+    <script>
+      // Set this to override the automatic detection in websocketServerConnect()
+      var ws_protocol = null // use default 'ws'
+      var ws_server = null // use default '127.0.0.1'
+      var ws_port = null // use default 8443
+      // Set this to use a specific peer id instead of a random one
+      var default_peer_id = null
+      // Override with your own STUN servers if you want
+      var rtc_configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+      // The default constraints that will be attempted. Can be overriden by the user.
+      var default_constraints = { video: true, audio: true }
+
+      var connect_attempts = 0
+      var conn = new RTCPeerConnection(rtc_configuration)
+      var send_channel
+      var ws
+      // Local stream after constraints are approved by the user
+      var local_stream = null
+      var remote_stream = null
+
+      // keep track of some negotiation state to prevent races and errors
+      var callCreateTriggered = false
+      var makingOffer = false
+      var isSettingRemoteAnswerPending = false
+
+      var videoElem
+
+      const $ = (id) => document.getElementById(id)
+
+      function onConnectClicked() {
+        if ($('peer-connect-button').value == 'Disconnect') {
+          ws.close()
+          return
+        }
+
+        var id = $('peer-connect').value
+        if (id == '') {
+          alert('Peer id must be filled out')
+          return
+        }
+
+        ws.send('SESSION ' + id)
+        $('peer-connect-button').value = 'Disconnect'
+      }
+
+      function onTextKeyPress(e) {
+        e = e ? e : window.event
+        if (e.code == 'Enter') {
+          onConnectClicked()
+          return false
+        }
+        return true
+      }
+
+      function handleIncomingError(error) {
+        setError('ERROR: ' + error)
+        ws.close()
+      }
+
+      function setStatus(text) {
+        console.log(text)
+        var span = $('status')
+        // Don't set the status if it already contains an error
+        if (!span.classList.contains('error')) span.textContent = text
+      }
+
+      function setError(text) {
+        console.error(text)
+        var span = $('status')
+        span.textContent = text
+        span.classList.add('error')
+      }
+
+      window.onload = function websocketServerConnect() {
+        connect_attempts++
+
+        if (connect_attempts > 3) {
+          setError('Too many connection attempts, aborting. Refresh page to try again')
+          return
+        }
+
+        // Clear errors in the status span
+        var span = $('status')
+        span.classList.remove('error')
+        span.textContent = ''
+
+        // Populate constraints
+        var textarea = $('constraints')
+        if (textarea.value == '') textarea.value = JSON.stringify(default_constraints)
+        // Fetch the peer id to use
+        var peer_id = default_peer_id || Math.floor(Math.random() * (9000 - 10) + 10).toString()
+        ws_protocol = ws_protocol || 'ws'
+        ws_port = ws_port || '8443'
+
+        if (window.location.protocol.startsWith('file')) {
+          ws_server = ws_server || '127.0.0.1'
+        } else if (window.location.protocol.startsWith('http')) {
+          ws_server = ws_server || window.location.hostname
+        } else {
+          throw new Error("Don't know how to connect to the signaling server with uri" + window.location)
+        }
+
+        var ws_url = ws_protocol + '://' + ws_server + ':' + ws_port
+        setStatus('Connecting to server ' + ws_url)
+        ws = new WebSocket(ws_url)
+
+        /* When connected, immediately register with the server */
+        ws.addEventListener('open', () => {
+          $('peer-id').textContent = peer_id
+          ws.send('HELLO ' + peer_id)
+          setStatus('Registering with server')
+          $('peer-connect-button').value = 'Connect'
+          // Reset connection attempts because we connected successfully
+          connect_attempts = 0
+        })
+
+        ws.addEventListener('error', function onServerError() {
+          setError('Unable to connect to server, did you add an exception for the certificate?')
+          // Retry after 3 seconds
+          window.setTimeout(websocketServerConnect, 3000)
+        })
+
+        ws.addEventListener('message', async function onServerMessage(event) {
+          switch (event.data) {
+            case 'HELLO':
+              setStatus('Registered with server, waiting for call')
+              return
+            case 'SESSION_OK':
+              setStatus('Starting negotiation')
+              if ($('remote-offerer').checked) {
+                ws.send('OFFER_REQUEST')
+                setStatus('Sent OFFER_REQUEST, waiting for offer')
+                return
+              }
+              if (!callCreateTriggered) {
+                createCall()
+                setStatus('Created peer connection for call, waiting for SDP')
+              }
+              return
+            case 'OFFER_REQUEST':
+              // The peer wants us to set up and then send an offer
+              if (!callCreateTriggered) createCall()
+              return
+            default:
+              if (event.data.startsWith('ERROR')) {
+                handleIncomingError(event.data)
+                return
+              }
+              // Handle incoming JSON SDP and ICE messages
+              try {
+                var msg = JSON.parse(event.data)
+
+                // Incoming JSON signals the beginning of a call
+                if (!callCreateTriggered) createCall()
+
+                if (msg.sdp != null) {
+                  try {
+                    // An offer may come in while we are busy processing SRD(answer).
+                    // In this case, we will be in "stable" by the time the offer is processed so it is safe to chain it on our Operations Chain now.
+                    const readyForOffer = !makingOffer && (conn.signalingState == 'stable' || isSettingRemoteAnswerPending)
+                    const offerCollision = msg.sdp.type == 'offer' && !readyForOffer
+
+                    if (offerCollision) {
+                      return
+                    }
+                    isSettingRemoteAnswerPending = msg.sdp.type == 'answer'
+
+                    const remoteDescription = new RTCSessionDescription(msg.sdp)
+                    console.log('Received Remote SDP offer:', remoteDescription)
+
+                    await conn.setRemoteDescription(remoteDescription)
+                    setStatus('Got SDP offer, waiting for getUserMedia to complete')
+
+                    isSettingRemoteAnswerPending = false
+                    if (msg.sdp.type == 'offer') {
+                      await getLocalStream()
+
+                      await conn.setLocalDescription()
+
+                      let sdp = conn.localDescription
+                      console.log('Sending SDP Answer:', sdp.sdp)
+                      ws.send(JSON.stringify({ sdp }))
+
+                      if (conn.iceConnectionState == 'connected') {
+                        setStatus('SDP ' + sdp.type + ' sent, ICE connected, all looks OK')
+                      }
+                    }
+                  } catch (err) {
+                    handleIncomingError(err)
+                  }
+                } else if (msg.ice != null) {
+                  conn.addIceCandidate(new RTCIceCandidate(msg.ice)).catch(setError)
+                } else {
+                  handleIncomingError('Unknown incoming JSON: ' + msg)
+                }
+              } catch (e) {
+                if (e instanceof SyntaxError) {
+                  handleIncomingError('Error parsing incoming JSON: ' + event.data)
+                } else {
+                  handleIncomingError('Unknown error parsing response: ' + event.data)
+                }
+                return
+              }
+          }
+        })
+
+        ws.addEventListener('close', async function onServerClose() {
+          setStatus('Disconnected from server')
+
+          // Release the webcam and mic
+          if (local_stream) {
+            if (local_stream) {
+              local_stream.getTracks().forEach((track) => {
+                track.stop()
+              })
+            }
+            local_stream = null
+          }
+
+          // Remove all video players
+          $('video').innerHTML = ''
+
+          if (conn) {
+            conn.close()
+            conn = new RTCPeerConnection(rtc_configuration)
+          }
+          callCreateTriggered = false
+
+          // Reset after a second
+          window.setTimeout(websocketServerConnect, 1000)
+        })
+      }
+
+      const handleDataChannelMessageReceived = (event) => {
+        console.log('dataChannel.OnMessage:', event, event.data.type)
+        setStatus('Received data channel message')
+        if (typeof event.data === 'string' || event.data instanceof String) {
+          console.log('Incoming string message: ' + event.data)
+          var textarea = $('text')
+          textarea.value = textarea.value + '\n' + event.data
+        } else {
+          console.log('Incoming data message')
+        }
+        send_channel.send('Hi! (from browser)')
+      }
+
+      async function createCall() {
+        callCreateTriggered = true
+        console.log('Configuring RTCPeerConnection')
+        send_channel = conn.createDataChannel('label', null)
+        send_channel.onopen = (event) => console.log('dataChannel.OnOpen', event)
+        send_channel.onmessage = handleDataChannelMessageReceived
+        send_channel.onerror = (error) => console.log('dataChannel.OnError:', error)
+        send_channel.onclose = (event) => console.log('dataChannel.OnClose', event)
+        conn.ondatachannel = function onDataChannel(event) {
+          setStatus('Data channel created')
+          let receiveChannel = event.channel
+          receiveChannel.onopen = (event) => console.log('dataChannel.OnOpen', event)
+          receiveChannel.onmessage = handleDataChannelMessageReceived
+          receiveChannel.onerror = (error) => console.log('dataChannel.OnError:', error)
+          receiveChannel.onclose = (event) => console.log('dataChannel.OnClose', event)
+        }
+
+        conn.ontrack = ({ streams }) => {
+          remote_stream = streams[0]
+
+          console.log('ontrack triggered ' + event.track.kind)
+          var div = $('video')
+          videoElem = document.createElement('video')
+          videoElem.textContent = "Your browser doesn't support video"
+          videoElem.autoplay = true
+          videoElem.playsinline = true
+          div.appendChild(videoElem)
+
+          if (event.track.kind === 'audio') videoElem.style.display = 'none'
+
+          videoElem.srcObject = remote_stream
+          videoElem.srcObject.addEventListener('mute', () => {
+            console.log('track muted, hiding video element')
+            videoElem.style.display = 'none'
+          })
+          videoElem.srcObject.addEventListener('unmute', () => {
+            console.log('track unmuted, showing video element')
+            videoElem.style.display = 'block'
+          })
+          videoElem.srcObject.addEventListener('removetrack', () => {
+            console.log('track removed, removing video element')
+            videoElem.remove()
+          })
+        }
+
+        conn.onicecandidate = (event) => {
+          // We have a candidate, send it to the remote party with the same uuid
+          if (event.candidate == null) {
+            console.log('ICE Candidate was null, done')
+            return
+          }
+          ws.send(JSON.stringify({ ice: event.candidate }))
+        }
+
+        conn.oniceconnectionstatechange = () => {
+          if (conn.iceConnectionState == 'connected') {
+            setStatus('ICE gathering complete')
+          }
+        }
+
+        // let the "negotiationneeded" event trigger offer generation
+        conn.onnegotiationneeded = async () => {
+          setStatus('Negotiation needed')
+          if ($('remote-offerer').checked) return
+          try {
+            makingOffer = true
+            await conn.setLocalDescription()
+            let sdp = conn.localDescription
+            setStatus('Sending SDP ' + sdp.type)
+            ws.send(JSON.stringify({ sdp }))
+          } catch (err) {
+            handleIncomingError(err)
+          } finally {
+            makingOffer = false
+          }
+        }
+
+        $('peer-connect-button').value = 'Disconnect'
+      }
+
+      /* Send our video/audio to the other peer */
+      async function getLocalStream() {
+        var constraints
+        try {
+          constraints = JSON.parse($('constraints').value)
+        } catch (e) {
+          console.error(e)
+          setError('ERROR parsing constraints: ' + e.message + ', using default constraints')
+          constraints = default_constraints
+        }
+
+        // Add local stream
+        if (navigator.mediaDevices.getUserMedia) {
+          local_stream = await navigator.mediaDevices.getUserMedia(constraints)
+          for (const track of local_stream.getTracks()) {
+            conn.addTrack(track, local_stream)
+          }
+          console.log('Adding local stream')
+        } else {
+          setError("Browser doesn't support getUserMedia!")
+        }
+      }
+
+      const getIpVersion = (ip) => (/^(\d{1,3}\.){3}\d{1,3}$/.test(ip) ? 'IPv4' : 'IPv6')
+
+      const resolveStats = (stats, obj, keys) => {
+        keys.forEach((key) => {
+          if (obj[key + 'Id']) obj[key] = stats.get(obj[key + 'Id'])
+        })
+      }
+
+      const transport = (stats, transport) => {
+        resolveStats(stats, transport, ['localCertificate', 'remoteCertificate', 'selectedCandidatePair'])
+        const pair = transport.selectedCandidatePair
+        if (pair) {
+          resolveStats(stats, pair, ['localCandidate', 'remoteCandidate'])
+          if (pair.localCandidate) pair.localCandidate.ipVersion = getIpVersion(pair.localCandidate.ip)
+          if (pair.remoteCandidate) pair.remoteCandidate.ipVersion = getIpVersion(pair.remoteCandidate.ip)
+        }
+        return transport
+      }
+
+      const rtp = (stats, rtp) => {
+        resolveStats(stats, rtp, ['codec', 'playout', 'mediaSource', 'remote', 'transport'])
+        if (rtp.remote && rtp.remote.codecId) rtp.remote.codec = stats.get(rtp.remote.codecId)
+        if (rtp.transport) rtp.transport = transport(stats, stats.get(rtp.transportId))
+        return rtp
+      }
+
+      setInterval(async () => {
+        if (!conn) return
+
+        let PeerConnection = null
+        const DataChannels = []
+        const stats = await conn.getStats(null)
+
+        stats.forEach((report) => {
+          switch (report.type) {
+            case 'inbound-rtp':
+              console.log(`Inbound RTP(${report.kind}):`, rtp(stats, report))
+              break
+            case 'outbound-rtp':
+              console.log(`Outbound RTP(${report.kind}):`, rtp(stats, report))
+              break
+            case 'peer-connection':
+              PeerConnection = report
+              break
+            case 'data-channel':
+              DataChannels.push(report)
+              break
+            default:
+              if (!['candidate-pair', 'local-candidate', 'remote-candidate', 'remote-inbound-rtp', 'remote-outbound-rtp', 'transport', 'media-source', 'media-playout', 'certificate', 'codec'].includes(report.type)) {
+                console.log('unknown type:', report.type)
+              }
+          }
+        })
+
+        if (PeerConnection) {
+          PeerConnection.dataChannels = DataChannels
+          console.log('Peer Connection:', PeerConnection)
+        }
+      }, 10000)
+    </script>
+  </head>
+
+  <body>
+    <div id="video"></div>
+    <div>Status: <span id="status">unknown</span></div>
+    <div><textarea id="text" cols="40" rows="4"></textarea></div>
+    <br />
+    <div>
+      <label for="peer-connect">Enter peer id</label>
+      <input id="peer-connect" type="text" name="text" onkeypress="onTextKeyPress();" required />
+      <input id="peer-connect-button" onclick="onConnectClicked();" type="button" value="Connect" />
+      <!-- Request the peer to send the offer by sending the OFFER_REQUEST message.
+        Same as the --remote-offerer flag in the sendrecv C example -->
+      <input id="remote-offerer" type="checkbox" autocomplete="off" /><span>Remote offerer</span>
+    </div>
+
+    <div>Our id is <b id="peer-id">unknown</b></div>
+    <br />
+    <div>
+      <div>getUserMedia constraints being used:</div>
+      <div><textarea id="constraints" cols="40" rows="4"></textarea></div>
+    </div>
+  </body>
+</html>
