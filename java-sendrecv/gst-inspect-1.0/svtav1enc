@@ -1,0 +1,131 @@
+Factory Details:
+  Rank                     secondary (128)
+  Long-name                SvtAv1Enc
+  Klass                    Codec/Encoder/Video
+  Description              Scalable Video Technology for AV1 Encoder (SVT-AV1 Encoder)
+  Author                   Jun Tian <jun.tian@intel.com> Xavier Hallade <xavier.hallade@intel.com>
+  Documentation            https://gstreamer.freedesktop.org/documentation/svtav1/#svtav1enc-page
+
+Plugin Details:
+  Name                     svtav1
+  Description              Scalable Video Technology for AV1 (SVT-AV1)
+  Filename                 /usr/local/Cellar/gstreamer/1.24.11/lib/gstreamer-1.0/libgstsvtav1.dylib
+  Version                  1.24.11
+  License                  LGPL
+  Source module            gst-plugins-bad
+  Documentation            https://gstreamer.freedesktop.org/documentation/svtav1/
+  Source release date      2025-01-06
+  Binary package           GStreamer Bad Plug-ins
+  Origin URL               https://github.com/Homebrew/homebrew-core
+
+GObject
+ +----GInitiallyUnowned
+       +----GstObject
+             +----GstElement
+                   +----GstVideoEncoder
+                         +----GstSvtAv1Enc
+
+Implemented Interfaces:
+  GstPreset
+
+Pad Templates:
+  SINK template: 'sink'
+    Availability: Always
+    Capabilities:
+      video/x-raw
+                 format: { (string)I420, (string)I420_10LE }
+                  width: [ 64, 16384 ]
+                 height: [ 64, 8704 ]
+              framerate: [ 0/1, 2147483647/1 ]
+  
+  SRC template: 'src'
+    Availability: Always
+    Capabilities:
+      video/x-av1
+          stream-format: obu-stream
+              alignment: tu
+                  width: [ 64, 16384 ]
+                 height: [ 64, 8704 ]
+              framerate: [ 0/1, 2147483647/1 ]
+
+Element has no clocking capabilities.
+Element has no URI handling capabilities.
+
+Pads:
+  SINK: 'sink'
+    Pad Template: 'sink'
+  SRC: 'src'
+    Pad Template: 'src'
+
+Element Properties:
+
+  cqp                 : Quantization parameter used in CQP mode (-1 is disabled)
+                        flags: 読み込み可能, 書き込み可能
+                        Integer. Range: -1 - 63 Default: -1 
+  
+  crf                 : Quantization parameter used in CRF mode (-1 is disabled)
+                        flags: 読み込み可能, 書き込み可能
+                        Integer. Range: -1 - 63 Default: 35 
+  
+  intra-period-length : Period of Intra Frames insertion (-2 is auto, -1 no updates)
+                        flags: 読み込み可能, 書き込み可能
+                        Integer. Range: -2 - 2147483647 Default: -2 
+  
+  intra-refresh-type  : CRA (open GOP)or IDR frames (closed GOP)
+                        flags: 読み込み可能, 書き込み可能
+                        Enum "GstSvtAv1EncIntraRefreshType" Default: 2, "IDR"
+                           (1): CRA              - Open GOP
+                           (2): IDR              - Closed GOP
+  
+  logical-processors  : Number of logical CPU cores to be used. 0: auto
+                        flags: 読み込み可能, 書き込み可能
+                        Unsigned Integer. Range: 0 - 4294967295 Default: 0 
+  
+  max-bitrate         : Maximum bitrate in kbits/sec. Enables VBR mode if a different target-bitrate is provided
+                        flags: 読み込み可能, 書き込み可能, changeable in NULL, READY, PAUSED or PLAYING state
+                        Unsigned Integer. Range: 0 - 100000 Default: 0 
+  
+  max-qp-allowed      : Maximum QP value allowed for rate control use Only used in CBR and VBR mode.
+                        flags: 読み込み可能, 書き込み可能
+                        Unsigned Integer. Range: 0 - 63 Default: 63 
+  
+  maximum-buffer-size : Maximum buffer size in milliseconds. Only used in CBR mode.
+                        flags: 読み込み可能, 書き込み可能
+                        Unsigned Integer. Range: 20 - 10000 Default: 1000 
+  
+  min-force-key-unit-interval: Minimum interval between force-keyunit requests in nanoseconds
+                        flags: 読み込み可能, 書き込み可能
+                        Unsigned Integer64. Range: 0 - 18446744073709551615 Default: 0 
+  
+  min-qp-allowed      : Minimum QP value allowed for rate control use Only used in CBR and VBR mode.
+                        flags: 読み込み可能, 書き込み可能
+                        Unsigned Integer. Range: 0 - 63 Default: 1 
+  
+  name                : The name of the object
+                        flags: 読み込み可能, 書き込み可能
+                        String. Default: "svtav1enc0"
+  
+  parameters-string   : Colon-delimited list of key=value pairs of additional parameters to set
+                        flags: 読み込み可能, 書き込み可能
+                        String. Default: null
+  
+  parent              : The parent of the object
+                        flags: 読み込み可能, 書き込み可能
+                        Object of type "GstObject"
+  
+  preset              : Quality vs density tradeoff point that the encoding is to be performed at (0 is the highest quality, 13 is the highest speed) 
+                        flags: 読み込み可能, 書き込み可能
+                        Unsigned Integer. Range: 0 - 13 Default: 10 
+  
+  qos                 : Handle Quality-of-Service events from downstream
+                        flags: 読み込み可能, 書き込み可能
+                        Boolean. Default: false
+  
+  target-bitrate      : Target bitrate in kbits/sec. Enables CBR or VBR mode
+                        flags: 読み込み可能, 書き込み可能
+                        Unsigned Integer. Range: 0 - 100000 Default: 0 
+  
+  target-socket       : Target CPU socket to run on. -1: all available
+                        flags: 読み込み可能, 書き込み可能
+                        Integer. Range: -1 - 15 Default: -1 
+  

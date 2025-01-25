@@ -8,11 +8,11 @@ services:
     depends_on:
       - signaling
 
-  java-sendrecv:
-    build: ./java-sendrecv
-    command: tail -f /dev/null
-    depends_on:
-      - signaling
+  # java-sendrecv:
+  #   build: ./java-sendrecv
+  #   command: tail -f /dev/null
+  #   depends_on:
+  #     - signaling
 
   signaling:
     build: ./signaling

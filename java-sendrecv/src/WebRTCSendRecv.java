@@ -13,6 +13,7 @@
  */
 import java.io.*;
 import java.net.URI;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.*;
 
@@ -28,6 +29,7 @@ import org.freedesktop.gstreamer.ElementFactory;
 import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.PadDirection;
 import org.freedesktop.gstreamer.Pipeline;
+import org.freedesktop.gstreamer.Registry;
 import org.freedesktop.gstreamer.SDPMessage;
 import org.freedesktop.gstreamer.State;
 import org.freedesktop.gstreamer.Version;
@@ -52,10 +54,11 @@ public class WebRTCSendRecv {
 
 	private static final Logger LOG = Logger.getLogger(WebRTCSendRecv.class.getName());
 
-//	private static final String REMOTE_SERVER_URL = "wss://webrtc.nirbheek.in:8443";
-	private static final String REMOTE_SERVER_URL = "ws://signaling:8443";
+	// private static final String REMOTE_SERVER_URL = "wss://webrtc.nirbheek.in:8443";
+	// private static final String REMOTE_SERVER_URL = "ws://signaling:8443";
+	private static final String REMOTE_SERVER_URL = "ws://localhost:8443";
 
-	static final String VIDEO_BIN_DESCRIPTION = """
+	public static final String VIDEO_BIN_DESCRIPTION_VP8 = """
 			videotestsrc is-live=true !
 			videoconvert !
 			queue !
@@ -63,6 +66,28 @@ public class WebRTCSendRecv {
 			rtpvp8pay !
 			queue !
 			capsfilter caps=application/x-rtp,media=video,encoding-name=VP8,payload=97
+			""";
+
+	public static final String VIDEO_BIN_DESCRIPTION_VP9 = """
+			videotestsrc is-live=true !
+			videoconvert !
+			videoscale !
+			video/x-raw,format=I420 !
+			queue !
+			vp9enc deadline=1 !
+			rtpvp9pay !
+			queue !
+			capsfilter caps=application/x-rtp,media=video,encoding-name=VP9,payload=97
+			""";
+
+	public static final String VIDEO_BIN_DESCRIPTION_H264 = """
+			videotestsrc is-live=true !
+			videoconvert !
+			queue !
+			x264enc bitrate=600 speed-preset=ultrafast tune=zerolatency key-int-max=15 !
+			rtph264pay !
+			queue !
+			capsfilter caps=application/x-rtp,media=video,encoding-name=H264,payload=97
 			""";
 
 	static final String AUDIO_BIN_DESCRIPTION = """
@@ -90,14 +115,14 @@ public class WebRTCSendRecv {
 			return;
 		}
 
-		// Registry registry = Registry.get();
-		// for (String element : List.of("opusenc", "nicesink", "webrtcbin", "dtlssrtpenc", "srtpenc", "rtpbin",
-		// 		"rtpopuspay")) {
-		// 	if (registry.lookupFeature(element) == null) {
-		// 		LOG.log(Level.SEVERE, String.format("Error: not found %s", element));
-		// 		System.exit(1);
-		// 	}
-		// }
+		Registry registry = Registry.get();
+		for (String element : List.of("opusenc", "nicesink", "webrtcbin", "dtlssrtpenc", "srtpenc", "rtpbin",
+				"rtpopuspay")) {
+			if (registry.lookupFeature(element) == null) {
+				LOG.log(Level.SEVERE, String.format("Error: not found %s", element));
+				// System.exit(1);
+			}
+		}
 
 		String serverUrl = REMOTE_SERVER_URL;
 		String peerId = null;
@@ -129,7 +154,7 @@ public class WebRTCSendRecv {
 	private WebRTCSendRecv(String peerId, String serverUrl) {
 		this.peerId = peerId;
 		this.serverUrl = serverUrl;
-		Bin video = Gst.parseBinFromDescription(VIDEO_BIN_DESCRIPTION, true);
+		Bin video = Gst.parseBinFromDescription(VIDEO_BIN_DESCRIPTION_H264, true);
 		Bin audio = Gst.parseBinFromDescription(AUDIO_BIN_DESCRIPTION, true);
 
 		pipe = new Pipeline();
@@ -231,7 +256,7 @@ public class WebRTCSendRecv {
 			pipe.setState(State.NULL);
 			session.close();
 		} catch (IOException e) {
-			e.printStackTrace();
+			LOG.log(Level.SEVERE, "Error while ending the call", e);
 		} finally {
 			Gst.quit();
 		}
