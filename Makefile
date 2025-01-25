@@ -33,3 +33,6 @@ clear:
 
 server:
 	COMPOSE_PROJECT_NAME=gst docker compose up --build
+
+down:
+	COMPOSE_PROJECT_NAME=gst docker compose down
