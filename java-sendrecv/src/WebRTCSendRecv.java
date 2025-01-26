@@ -55,8 +55,8 @@ public class WebRTCSendRecv {
 	private static final Logger LOG = Logger.getLogger(WebRTCSendRecv.class.getName());
 
 	// private static final String REMOTE_SERVER_URL = "wss://webrtc.nirbheek.in:8443";
-	// private static final String REMOTE_SERVER_URL = "ws://signaling:8443";
-	private static final String REMOTE_SERVER_URL = "ws://localhost:8443";
+	private static final String REMOTE_SERVER_URL = "ws://signaling:8443";
+	// private static final String REMOTE_SERVER_URL = "ws://localhost:8443";
 
 	public static final String VIDEO_BIN_DESCRIPTION_VP8 = """
 			videotestsrc is-live=true !
