@@ -1,14 +1,123 @@
 <!doctype html>
 
-<html>
+<html class="ocks-org">
   <head>
     <meta charset="utf-8" />
     <style>
+      @import url(../style.css);
+
+      .x.axis line {
+        shape-rendering: auto;
+      }
+
+      .line {
+        fill: none;
+        stroke: #000;
+        stroke-width: 1.5px;
+      }
+
       .error {
         color: red;
       }
+      #peercontainer {
+        display: flex;
+        gap: 10px;
+        padding: 10px;
+      }
+
+      #peercontainer > div {
+        border: 1px solid #ccc;
+        padding: 10px;
+        box-sizing: border-box;
+      }
+
+      #peercontainer > div:first-child {
+        flex: 1;
+        min-width: 200px;
+      }
+
+      #peercontainer > div:last-child {
+        flex: 3;
+      }
+
+      #rtpcontainer {
+        display: flex;
+        flex-direction: column;
+      }
+
+      #ctatisticscontainer {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        overflow-x: auto;
+        padding: 10px;
+      }
+
+      #ctatisticscontainer > div {
+        flex: 1;
+        min-width: 200px;
+        border: 1px solid #ccc;
+        padding: 10px;
+        box-sizing: border-box;
+      }
+
+      #ctatisticscontainer > div > pre {
+        text-align: left;
+        margin: 0;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
     </style>
-    <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+
+    <script src="//webrtc.github.io/adapter/adapter-latest.js"></script>
+    <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
+
+    <script>
+      var n = 40,
+        random = d3.random.normal(0, 0)
+      function roundUpToNearestHalf(value) {
+        return Math.ceil(value * 2) / 2
+      }
+      function chart(id, xdomain, ydomain, interpolation, tick) {
+        var data = d3.range(n).map(random)
+
+        var margin = { top: 6, right: 0, bottom: 6, left: 40 },
+          width = 960 - margin.right,
+          height = 120 - margin.top - margin.bottom
+
+        var x = d3.scale.linear().domain(xdomain).range([0, width])
+        var y = d3.scale.linear().domain(ydomain).range([height, 0])
+
+        var line = d3.svg
+          .line()
+          .interpolate(interpolation)
+          .x((d, i) => {
+            return x(i)
+          })
+          .y((d, i) => {
+            return y(d)
+          })
+
+        var svg = d3
+          .select(id)
+          .append('p')
+          .append('svg')
+          .attr('width', width + margin.left + margin.right)
+          .attr('height', height + margin.top + margin.bottom)
+          // .style('margin-left', -margin.left + 'px')
+          .append('g')
+          .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')')
+
+        svg.append('defs').append('clipPath').attr('id', 'clip').append('rect').attr('width', width).attr('height', height)
+
+        svg.append('g').attr('class', 'y axis').call(d3.svg.axis().scale(y).ticks(5).orient('left'))
+
+        var path = svg.append('g').attr('clip-path', 'url(#clip)').append('path').datum(data).attr('class', 'line').attr('d', line)
+
+        tick(path, line, data, x)
+      }
+    </script>
+
     <script>
       // Set this to override the automatic detection in websocketServerConnect()
       var ws_protocol = null // use default 'ws'
@@ -28,6 +137,7 @@
       // Local stream after constraints are approved by the user
       var local_stream = null
       var remote_stream = null
+      var start_timestamp = null
 
       // keep track of some negotiation state to prevent races and errors
       var callCreateTriggered = false
@@ -311,6 +421,7 @@
 
         conn.oniceconnectionstatechange = () => {
           if (conn.iceConnectionState == 'connected') {
+            start_timestamp = Date.now()
             setStatus('ICE gathering complete')
           }
         }
@@ -384,6 +495,69 @@
         return rtp
       }
 
+      const prev = {}
+      const performance = {}
+
+      const reproductionTime = (latestTimestamp) => {
+        if (!start_timestamp) return 'N/A'
+        const elapsedTime = latestTimestamp - start_timestamp
+        if (elapsedTime < 0) return 'N/A'
+        const totalSeconds = Math.floor(elapsedTime / 1000)
+        const minutes = Math.floor(totalSeconds / 60)
+        const seconds = totalSeconds % 60
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`
+      }
+
+      const measureStreamingMetrics = (report) => {
+        let totalBytes = 0
+        let totalFrames = 0
+        let latestTimestamp = 0
+        const { type, kind } = report
+        let key = `${type}-${kind}`
+
+        if (kind !== 'audio') {
+          totalFrames = 0
+        }
+
+        if (type === 'inbound-rtp') {
+          const { bytesReceived, framesDecoded, timestamp } = report
+          totalBytes += bytesReceived
+          if (kind !== 'audio') {
+            totalFrames += framesDecoded
+          }
+          latestTimestamp = Math.max(latestTimestamp, timestamp || 0)
+        }
+
+        if (type === 'outbound-rtp') {
+          const { bytesSent, framesEncoded, timestamp } = report
+          totalBytes += bytesSent
+          if (kind !== 'audio') {
+            totalFrames += framesEncoded
+          }
+          latestTimestamp = Math.max(latestTimestamp, timestamp || 0)
+        }
+
+        const prevEntry = prev[key] || { totalBytes: 0, totalFrames: 0, latestTimestamp: 0 }
+        const timeDiff = latestTimestamp - prevEntry.latestTimestamp
+
+        if (timeDiff <= 0) return prev[key]
+
+        const bytesDiff = totalBytes - prevEntry.totalBytes
+        const framesDiff = totalFrames - prevEntry.totalFrames
+        const bitrate = (bytesDiff * 8) / (timeDiff / 1000)
+        const fps = kind !== 'audio' ? framesDiff / (timeDiff / 1000) : 0
+
+        prev[key] = { fps, bitrate, totalBytes, totalFrames, latestTimestamp }
+
+        performance[key] = {
+          fps: fps.toFixed(2),
+          bitrate: (bitrate / 1000000).toFixed(2), // bps -> Mbps
+          totalBytes: (totalBytes / (1024 * 1024)).toFixed(2),
+          totalFrames: totalFrames.toLocaleString(),
+          reproductionTime: reproductionTime(latestTimestamp),
+        }
+      }
+
       setInterval(async () => {
         if (!conn) return
 
@@ -394,10 +568,32 @@
         stats.forEach((report) => {
           switch (report.type) {
             case 'inbound-rtp':
-              console.log(`Inbound RTP(${report.kind}):`, rtp(stats, report))
+              if (report.kind === 'video') {
+                $('inbound-rtp-video').innerText = JSON.stringify(rtp(stats, report), null, 2).replaceAll('"', '')
+                const metrics = performance['inbound-rtp-video'] || { fps: 0, bitrate: 0, totalBytes: 0, totalFrames: 0, reproductionTime: '00:00' }
+                $('inbound-rtp-video-chart').firstChild.data = `Inbound RTP Video　　ReproductionTime:${metrics.reproductionTime}　FPS:${metrics.fps}　Speed:${metrics.bitrate}Mbps　TotalBytes:${metrics.totalBytes}MB　TotalFrames:${metrics.totalFrames}`
+              }
+              if (report.kind === 'audio') {
+                $('inbound-rtp-audio').innerText = JSON.stringify(rtp(stats, report), null, 2).replaceAll('"', '')
+                const metrics = performance['inbound-rtp-audio'] || { fps: 0, bitrate: 0, totalBytes: 0, totalFrames: 0, reproductionTime: '00:00' }
+                $('inbound-rtp-audio-chart').firstChild.data = `Inbound RTP Audio　　ReproductionTime:${metrics.reproductionTime}　Speed:${metrics.bitrate}Mbps　TotalBytes:${metrics.totalBytes}MB`
+              }
+              measureStreamingMetrics(report)
+              // console.log(`Inbound RTP(${report.kind}):`, rtp(stats, report))
               break
             case 'outbound-rtp':
-              console.log(`Outbound RTP(${report.kind}):`, rtp(stats, report))
+              if (report.kind === 'video') {
+                $('outbound-rtp-video').innerText = JSON.stringify(rtp(stats, report), null, 2).replaceAll('"', '')
+                const metrics = performance['outbound-rtp-video'] || { fps: 0, bitrate: 0, totalBytes: 0, totalFrames: 0, reproductionTime: '00:00' }
+                $('outbound-rtp-video-chart').firstChild.data = `Outbound RTP Video　　ReproductionTime:${metrics.reproductionTime}　FPS:${metrics.fps}　Speed:${metrics.bitrate}Mbps　TotalBytes:${metrics.totalBytes}MB　TotalFrames:${metrics.totalFrames}`
+              }
+              if (report.kind === 'audio') {
+                $('outbound-rtp-audio').innerText = JSON.stringify(rtp(stats, report), null, 2).replaceAll('"', '')
+                const metrics = performance['outbound-rtp-audio'] || { fps: 0, bitrate: 0, totalBytes: 0, totalFrames: 0, reproductionTime: '00:00' }
+                $('outbound-rtp-audio-chart').firstChild.data = `Outbound RTP Audio　　ReproductionTime:${metrics.reproductionTime}　Speed:${metrics.bitrate}Mbps　TotalBytes:${metrics.totalBytes}MB`
+              }
+              measureStreamingMetrics(report)
+              // console.log(`Outbound RTP(${report.kind}):`, rtp(stats, report))
               break
             case 'peer-connection':
               PeerConnection = report
@@ -414,9 +610,10 @@
 
         if (PeerConnection) {
           PeerConnection.dataChannels = DataChannels
-          console.log('Peer Connection:', PeerConnection)
+          $('peer-connection').innerText = JSON.stringify(rtp(stats, PeerConnection), null, 2).replaceAll('"', '')
+          // console.log('Peer Connection:', PeerConnection)
         }
-      }, 10000)
+      }, 1000)
     </script>
   </head>
 
@@ -439,6 +636,113 @@
     <div>
       <div>getUserMedia constraints being used:</div>
       <div><textarea id="constraints" cols="40" rows="4"></textarea></div>
+    </div>
+    <div id="peercontainer">
+      <div>
+        Peer Connection
+        <pre id="peer-connection"></pre>
+      </div>
+      <div id="rtpcontainer">
+        <div id="inbound-rtp-video-chart">
+          Inbound RTP Video
+          <script>
+            ;(() => {
+              var transition = d3.select({}).transition().duration(750).ease('linear')
+              chart('#inbound-rtp-video-chart', [1, n - 2], [0, 0.2], 'basis', function tick(path, line, data, x) {
+                // roundUpToNearestHalf(d3.max(data))
+                transition = transition
+                  .each(() => {
+                    const metrics = performance['inbound-rtp-video'] || { bitrate: 0 }
+                    data.push(metrics.bitrate)
+                    path
+                      .attr('d', line)
+                      .attr('transform', null)
+                      .transition()
+                      .attr('transform', 'translate(' + x(0) + ')')
+                    data.shift()
+                  })
+                  .transition()
+                  .each('start', () => tick(path, line, data, x))
+              })
+            })()
+          </script>
+        </div>
+        <div id="inbound-rtp-audio-chart">
+          Inbound RTP Audio
+          <script>
+            ;(() => {
+              var transition = d3.select({}).transition().duration(750).ease('linear')
+              chart('#inbound-rtp-audio-chart', [1, n - 2], [0, 0.2], 'basis', function tick(path, line, data, x) {
+                transition = transition
+                  .each(() => {
+                    const metrics = performance['inbound-rtp-audio'] || { bitrate: 0 }
+                    data.push(metrics.bitrate)
+                    path
+                      .attr('d', line)
+                      .attr('transform', null)
+                      .transition()
+                      .attr('transform', 'translate(' + x(0) + ')')
+                    data.shift()
+                  })
+                  .transition()
+                  .each('start', () => tick(path, line, data, x))
+              })
+            })()
+          </script>
+        </div>
+        <div id="outbound-rtp-video-chart">
+          Outbound RTP Video
+          <script>
+            ;(() => {
+              var transition = d3.select({}).transition().duration(750).ease('linear')
+              chart('#outbound-rtp-video-chart', [1, n - 2], [0, 3], 'basis', function tick(path, line, data, x) {
+                transition = transition
+                  .each(() => {
+                    const metrics = performance['outbound-rtp-video'] || { bitrate: 0 }
+                    data.push(metrics.bitrate)
+                    path
+                      .attr('d', line)
+                      .attr('transform', null)
+                      .transition()
+                      .attr('transform', 'translate(' + x(0) + ')')
+                    data.shift()
+                  })
+                  .transition()
+                  .each('start', () => tick(path, line, data, x))
+              })
+            })()
+          </script>
+        </div>
+        <div id="outbound-rtp-audio-chart">
+          Outbound RTP Audio
+          <script>
+            ;(() => {
+              var transition = d3.select({}).transition().duration(750).ease('linear')
+              chart('#outbound-rtp-audio-chart', [1, n - 2], [0, 0.2], 'basis', function tick(path, line, data, x) {
+                transition = transition
+                  .each(() => {
+                    const metrics = performance['outbound-rtp-audio'] || { bitrate: 0 }
+                    data.push(metrics.bitrate)
+                    path
+                      .attr('d', line)
+                      .attr('transform', null)
+                      .transition()
+                      .attr('transform', 'translate(' + x(0) + ')')
+                    data.shift()
+                  })
+                  .transition()
+                  .each('start', () => tick(path, line, data, x))
+              })
+            })()
+          </script>
+        </div>
+      </div>
+    </div>
+    <div id="ctatisticscontainer">
+      <div>Inbound RTP Video<pre id="inbound-rtp-video"></pre></div>
+      <div>Inbound RTP Audio<pre id="inbound-rtp-audio"></pre></div>
+      <div>Outbound RTP Video<pre id="outbound-rtp-video"></pre></div>
+      <div>Outbound RTP Audio<pre id="outbound-rtp-audio"></pre></div>
     </div>
   </body>
 </html>
