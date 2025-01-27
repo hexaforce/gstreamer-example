@@ -16,44 +16,7 @@
 gchar *video_priority = NULL;
 gchar *audio_priority = NULL;
 
-const gchar *html_source = " \n \
-<html>\n \
-  <head>\n \
-    <script type='text/javascript'>\n \
-      window.onload = () => {\n \
-        var l = window.location\n \
-        var ws = new WebSocket(`${l.protocol}ws`)\n \
-        var conn\n \
-        ws.onmessage = async (event) => {\n \
-          try {\n \
-            const { type, data } = JSON.parse(event.data)\n \
-            if (!conn) {\n \
-              conn = new RTCPeerConnection({ iceServers: [{ urls: 'stun:" STUN_SERVER "' }] })\n \
-              conn.ontrack = (event) => (document.getElementById('stream').srcObject = event.streams[0])\n \
-              conn.onicecandidate = (event) => event.candidate && ws.send(JSON.stringify({ type: 'ice', data: event.candidate }))\n \
-            }\n \
-            if (type == 'sdp') {\n \
-              await conn.setRemoteDescription(data)\n \
-              const desc = await conn.createAnswer()\n \
-              await conn.setLocalDescription(desc)\n \
-              ws.send(JSON.stringify({ type: 'sdp', data: conn.localDescription }))\n \
-            } else if (type == 'ice') {\n \
-              await conn.addIceCandidate(new RTCIceCandidate(data))\n \
-            }\n \
-          } catch (err) {\n \
-            console.error(err)\n \
-          }\n \
-        }\n \
-      }\n \
-    </script>\n \
-  </head>\n \
-  <body>\n \
-    <div>\n \
-      <video id='stream' autoplay playsinline muted>Your browser does not support video</video>\n \
-    </div>\n \
-  </body>\n \
-</html>\n \
-";
+GObject *send_channel, *receive_channel;
 
 void set_sender_priority(GstWebRTCRTPTransceiver *trans, gchar *_priority) {
   if (_priority) {
@@ -79,6 +42,11 @@ void set_sender_priority(GstWebRTCRTPTransceiver *trans, gchar *_priority) {
   }
 }
 
+void on_data_channel(GstElement *webrtc, GObject *data_channel, gpointer user_data) {
+  connect_data_channel_signals(data_channel);
+  receive_channel = data_channel;
+}
+
 void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConnection *connection, G_GNUC_UNUSED const char *path, G_GNUC_UNUSED SoupClientContext *client_context, gpointer user_data) {
   ReceiverEntry *receiver_entry;
   GHashTable *receiver_entry_table = (GHashTable *)user_data;
@@ -88,6 +56,7 @@ void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConne
   g_signal_connect(G_OBJECT(connection), "closed", G_CALLBACK(soup_websocket_closed_cb), (gpointer)receiver_entry_table);
 
   GError *error;
+  char *pipeline_desc;
   GstWebRTCRTPTransceiver *trans;
   GArray *transceivers;
   GstBus *bus;
@@ -99,21 +68,24 @@ void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConne
 
   g_signal_connect(G_OBJECT(connection), "message", G_CALLBACK(soup_websocket_message_cb), (gpointer)receiver_entry);
 
+  // "video/x-raw,width=1920,height=1080,framerate=30/1 ! "
+  // "video/x-raw,width=1280,height=720,framerate=30/1 ! "
+  // "video/x-raw,width=960,height=540,framerate=15/1 ! "
+  // "video/x-raw,width=640,height=360,framerate=15/1 ! "
+
   // === pipeline config =============================
-  error = NULL;
-  receiver_entry->pipeline = gst_parse_launch( //
-      "webrtcbin name=webrtcbin stun-server=stun://" STUN_SERVER " " VIDEO_SRC " ! "
+  pipeline_desc = g_strdup_printf( //
+      "webrtcbin name=webrtcbin " VIDEO_SRC " ! "
       "videorate ! "
       "videoscale ! "
-      "video/x-raw,width=640,height=360,framerate=15/1 ! "
+      "video/x-raw,width=960,height=540,framerate=15/1 ! "
       "videoconvert ! "
       "queue max-size-buffers=1 ! "
-      "x264enc bitrate=600 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! "
-      "video/x-h264,profile=constrained-baseline ! "
+      "vp8enc target-bitrate=600000 deadline=1 keyframe-max-dist=15 ! "
+      "video/x-vp8 ! "
       "queue max-size-time=100000000 ! "
-      "h264parse ! "
-      "rtph264pay config-interval=-1 name=payloader aggregate-mode=zero-latency ! "
-      "application/x-rtp,media=video,encoding-name=H264,payload=" RTP_PAYLOAD_TYPE " ! "
+      "rtpvp8pay name=payloader ! "
+      "application/x-rtp,media=video,encoding-name=VP8,payload=" RTP_PAYLOAD_TYPE " ! "
       "webrtcbin. "
       "autoaudiosrc ! "
       "queue max-size-buffers=1 leaky=downstream ! "
@@ -122,8 +94,32 @@ void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConne
       "opusenc perfect-timestamp=true ! "
       "rtpopuspay pt=" RTP_AUDIO_PAYLOAD_TYPE " ! "
       "application/x-rtp, encoding-name=OPUS ! "
-      "webrtcbin. ",
-      &error);
+      "webrtcbin. ");
+  // pipeline_desc = g_strdup_printf( //
+  //     "webrtcbin name=webrtcbin " VIDEO_SRC " ! "
+  //     "videorate ! "
+  //     "videoscale ! "
+  //     "video/x-raw,width=1920,height=1080,framerate=30/1 ! "
+  //     "videoconvert ! "
+  //     "queue max-size-buffers=1 ! "
+  //     "x264enc bitrate=600 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! "
+  //     "video/x-h264,profile=constrained-baseline ! "
+  //     "queue max-size-time=100000000 ! "
+  //     "h264parse ! "
+  //     "rtph264pay config-interval=-1 name=payloader aggregate-mode=zero-latency ! "
+  //     "application/x-rtp,media=video,encoding-name=H264,payload=" RTP_PAYLOAD_TYPE " ! "
+  //     "webrtcbin. "
+  //     "autoaudiosrc ! "
+  //     "queue max-size-buffers=1 leaky=downstream ! "
+  //     "audioconvert ! "
+  //     "audioresample ! "
+  //     "opusenc perfect-timestamp=true ! "
+  //     "rtpopuspay pt=" RTP_AUDIO_PAYLOAD_TYPE " ! "
+  //     "application/x-rtp, encoding-name=OPUS ! "
+  //     "webrtcbin. ");
+
+  error = NULL;
+  receiver_entry->pipeline = gst_parse_launch(pipeline_desc, &error);
   if (error != NULL) {
     g_error("Could not create WebRTC pipeline: %s\n", error->message);
     g_error_free(error);
@@ -131,7 +127,9 @@ void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConne
   }
 
   receiver_entry->webrtcbin = gst_bin_get_by_name(GST_BIN(receiver_entry->pipeline), "webrtcbin");
-  g_assert(receiver_entry->webrtcbin != NULL);
+  g_assert_nonnull(receiver_entry->webrtcbin);
+  gst_util_set_object_arg(G_OBJECT(receiver_entry->webrtcbin), "bundle-policy", "max-bundle");
+  gst_util_set_object_arg(G_OBJECT(receiver_entry->webrtcbin), "stun-server", "stun://" STUN_SERVER );
 
   // === transceiver config =============================
 
@@ -151,9 +149,23 @@ void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConne
 
   g_signal_connect(receiver_entry->webrtcbin, "on-ice-candidate", G_CALLBACK(on_ice_candidate_cb), (gpointer)receiver_entry);
 
+  g_signal_connect(receiver_entry->webrtcbin, "notify::ice-gathering-state", G_CALLBACK(on_ice_gathering_state_notify), NULL);
+
   bus = gst_pipeline_get_bus(GST_PIPELINE(receiver_entry->pipeline));
   gst_bus_add_watch(bus, bus_watch_cb, receiver_entry->pipeline);
   gst_object_unref(bus);
+
+  gst_element_set_state(receiver_entry->pipeline, GST_STATE_READY);
+
+  g_signal_emit_by_name(receiver_entry->webrtcbin, "create-data-channel", "sensor-reading-channel", NULL, &send_channel);
+  if (send_channel) {
+    gst_print("Created data channel\n");
+    connect_data_channel_signals(send_channel);
+  } else {
+    gst_print("Could not create data channel, is usrsctp available?\n");
+  }
+
+  g_signal_connect(receiver_entry->webrtcbin, "on-data-channel", G_CALLBACK(on_data_channel), NULL);
 
   if (gst_element_set_state(receiver_entry->pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE)
     g_error("Could not start pipeline");
@@ -188,6 +200,7 @@ int gst_main(int argc, char *argv[]) {
   GError *error = NULL;
 
   setlocale(LC_ALL, "");
+  gst_debug_set_default_threshold(GST_LEVEL_WARNING);
 
   context = g_option_context_new("- gstreamer webrtc sendonly demo");
   g_option_context_add_main_entries(context, entries, NULL);
@@ -200,7 +213,7 @@ int gst_main(int argc, char *argv[]) {
   receiver_entry_table = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, destroy_receiver_entry);
 
   mainloop = g_main_loop_new(NULL, FALSE);
-  g_assert(mainloop != NULL);
+  g_assert_nonnull(mainloop);
 
 #if defined(G_OS_UNIX) || defined(__APPLE__)
   g_unix_signal_add(SIGINT, exit_sighandler, mainloop);
@@ -208,7 +221,7 @@ int gst_main(int argc, char *argv[]) {
 #endif
 
   soup_server = soup_server_new(SOUP_SERVER_SERVER_HEADER, "webrtc-soup-server", NULL);
-  soup_server_add_handler(soup_server, "/", soup_http_handler, (gpointer)html_source, NULL);
+  soup_server_add_handler(soup_server, "/", soup_http_handler, NULL, NULL);
   soup_server_add_websocket_handler(soup_server, "/ws", NULL, NULL, soup_websocket_handler, (gpointer)receiver_entry_table, NULL);
   soup_server_listen_all(soup_server, SOUP_HTTP_PORT, (SoupServerListenOptions)0, NULL);
 

@@ -28,6 +28,8 @@ struct _ReceiverEntry {
   GstElement *webrtcbin;
 };
 
+gchar *read_file(const gchar *filename);
+
 gchar *get_string_from_json_object(JsonObject *object);
 
 gboolean bus_watch_cb(GstBus *bus, GstMessage *message, gpointer user_data);
@@ -38,11 +40,15 @@ void on_negotiation_needed_cb(GstElement *webrtcbin, gpointer user_data);
 
 void on_ice_candidate_cb(G_GNUC_UNUSED GstElement *webrtcbin, guint mline_index, gchar *candidate, gpointer user_data);
 
+void on_ice_gathering_state_notify(GstElement *webrtcbin, GParamSpec *pspec, gpointer user_data);
+
 void destroy_receiver_entry(gpointer receiver_entry_ptr);
 
 void soup_websocket_closed_cb(SoupWebsocketConnection *connection, gpointer user_data);
 
 void soup_http_handler(G_GNUC_UNUSED SoupServer *soup_server, SoupMessage *message, const char *path, G_GNUC_UNUSED GHashTable *query, G_GNUC_UNUSED SoupClientContext *client_context, G_GNUC_UNUSED gpointer user_data);
+
+void connect_data_channel_signals(GObject *data_channel);
 
 G_END_DECLS
 

@@ -146,6 +146,25 @@ void on_ice_candidate_cb(G_GNUC_UNUSED GstElement *webrtcbin, guint mline_index,
   g_free(json_string);
 }
 
+void on_ice_gathering_state_notify(GstElement *webrtcbin, GParamSpec *pspec, gpointer user_data) {
+  GstWebRTCICEGatheringState ice_gather_state;
+  const gchar *new_state = "unknown";
+
+  g_object_get(webrtcbin, "ice-gathering-state", &ice_gather_state, NULL);
+  switch (ice_gather_state) {
+  case GST_WEBRTC_ICE_GATHERING_STATE_NEW:
+    new_state = "new";
+    break;
+  case GST_WEBRTC_ICE_GATHERING_STATE_GATHERING:
+    new_state = "gathering";
+    break;
+  case GST_WEBRTC_ICE_GATHERING_STATE_COMPLETE:
+    new_state = "complete";
+    break;
+  }
+  gst_print("ICE gathering state changed to %s\n", new_state);
+}
+
 void soup_websocket_message_cb(G_GNUC_UNUSED SoupWebsocketConnection *connection, SoupWebsocketDataType data_type, GBytes *message, gpointer user_data) {
   gsize size;
   const gchar *data;
@@ -230,6 +249,39 @@ void soup_websocket_message_cb(G_GNUC_UNUSED SoupWebsocketConnection *connection
       goto cleanup;
     }
 
+    guint medias_len, formats_len;
+    guint opus_pt = 0, h264_pt = 0, vp8_pt = 0;
+
+    gst_println("Parsing offer to find payload types");
+
+    medias_len = gst_sdp_message_medias_len(sdp);
+    for (int i = 0; i < medias_len; i++) {
+      const GstSDPMedia *media = gst_sdp_message_get_media(sdp, i);
+      formats_len = gst_sdp_media_formats_len(media);
+      for (int j = 0; j < formats_len; j++) {
+        guint pt;
+        GstCaps *caps;
+        GstStructure *s;
+        const char *fmt, *encoding_name;
+
+        fmt = gst_sdp_media_get_format(media, j);
+        if (g_strcmp0(fmt, "webrtc-datachannel") == 0)
+          continue;
+        pt = atoi(fmt);
+        caps = gst_sdp_media_get_caps_from_media(media, pt);
+        s = gst_caps_get_structure(caps, 0);
+        encoding_name = gst_structure_get_string(s, "encoding-name");
+        if (vp8_pt == 0 && g_strcmp0(encoding_name, "VP8") == 0)
+          vp8_pt = pt;
+        if (h264_pt == 0 && g_strcmp0(encoding_name, "H264") == 0)
+          h264_pt = pt;
+        if (opus_pt == 0 && g_strcmp0(encoding_name, "OPUS") == 0)
+          opus_pt = pt;
+      }
+    }
+
+    gst_println("Starting pipeline with vp8 pt: %u h264 pt: %u opus pt: %u", vp8_pt, h264_pt, opus_pt);
+
     answer = gst_webrtc_session_description_new(GST_WEBRTC_SDP_TYPE_ANSWER, sdp);
     g_assert_nonnull(answer);
 
@@ -277,20 +329,72 @@ void soup_websocket_closed_cb(SoupWebsocketConnection *connection, gpointer user
   gst_print("Closed websocket connection %p\n", (gpointer)connection);
 }
 
-void soup_http_handler(G_GNUC_UNUSED SoupServer *soup_server, SoupMessage *message, const char *path, G_GNUC_UNUSED GHashTable *query, G_GNUC_UNUSED SoupClientContext *client_context, G_GNUC_UNUSED gpointer user_data) {
-  gchar *html_source = (gchar *)user_data;
-  SoupBuffer *soup_buffer;
-
-  if ((g_strcmp0(path, "/") != 0) && (g_strcmp0(path, "/index.html") != 0)) {
-    soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
-    return;
+gchar *read_file(const gchar *path) {
+  GError *error = NULL;
+  gsize length = 0;
+  gchar *content = NULL;
+  if (!g_file_get_contents(path, &content, &length, &error)) {
+    g_error_free(error);
+    return NULL;
   }
+  return content;
+}
+void soup_http_handler(G_GNUC_UNUSED SoupServer *soup_server, SoupMessage *message, const char *path, G_GNUC_UNUSED GHashTable *query, G_GNUC_UNUSED SoupClientContext *client_context, G_GNUC_UNUSED gpointer user_data) {
+    SoupBuffer *soup_buffer = NULL;
+    gchar *file_content = NULL;
+    if (g_strcmp0(path, "/") == 0) {
+        path = "/index.html";
+    }
+    gchar *file_path = g_strdup_printf(".%s", path);
+    GError *error = NULL;
+    gsize file_size = 0;
+    if (!g_file_get_contents(file_path, &file_content, &file_size, &error)) {
+        soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
+        g_free(file_path);
+        if (error != NULL) {
+            g_error_free(error);
+        }
+        return;
+    }
+    soup_buffer = soup_buffer_new(SOUP_MEMORY_TAKE, file_content, file_size);
+    soup_message_body_append_buffer(message->response_body, soup_buffer);
+    soup_buffer_free(soup_buffer);
+    const char *content_type = "text/html";
+    if (g_str_has_suffix(file_path, ".css")) {
+        content_type = "text/css";
+    } else if (g_str_has_suffix(file_path, ".js")) {
+        content_type = "application/javascript";
+    } else if (g_str_has_suffix(file_path, ".ico")) {
+        content_type = "image/x-icon";
+    }
+    soup_message_headers_set_content_type(message->response_headers, content_type, NULL);
+    soup_message_set_status(message, SOUP_STATUS_OK);
+    g_free(file_path);
+}
 
-  soup_buffer = soup_buffer_new(SOUP_MEMORY_STATIC, html_source, strlen(html_source));
+void data_channel_on_error(GObject *dc, gpointer user_data) {
+  // cleanup_and_quit_loop("Data channel error", 0);
+}
 
-  soup_message_headers_set_content_type(message->response_headers, "text/html", NULL);
-  soup_message_body_append_buffer(message->response_body, soup_buffer);
-  soup_buffer_free(soup_buffer);
+void data_channel_on_open(GObject *dc, gpointer user_data) {
+  GBytes *bytes = g_bytes_new("data", strlen("data"));
+  gst_print("data channel opened\n");
+  g_signal_emit_by_name(dc, "send-string", "Hi! from GStreamer");
+  g_signal_emit_by_name(dc, "send-data", bytes);
+  g_bytes_unref(bytes);
+}
 
-  soup_message_set_status(message, SOUP_STATUS_OK);
+void data_channel_on_close(GObject *dc, gpointer user_data) {
+  // cleanup_and_quit_loop("Data channel closed", 0);
+}
+
+void data_channel_on_message_string(GObject *dc, gchar *str, gpointer user_data) {
+  gst_print("Received data channel message: %s\n", str);
+}
+
+void connect_data_channel_signals(GObject *data_channel) {
+  g_signal_connect(data_channel, "on-error", G_CALLBACK(data_channel_on_error), NULL);
+  g_signal_connect(data_channel, "on-open", G_CALLBACK(data_channel_on_open), NULL);
+  g_signal_connect(data_channel, "on-close", G_CALLBACK(data_channel_on_close), NULL);
+  g_signal_connect(data_channel, "on-message-string", G_CALLBACK(data_channel_on_message_string), NULL);
 }

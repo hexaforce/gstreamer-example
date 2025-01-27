@@ -1,10 +1,27 @@
 <!doctype html>
-
-<html class="ocks-org">
+<html>
   <head>
     <meta charset="utf-8" />
     <style>
-      @import url(../style.css);
+      @import url(//fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;700&display=swap);
+
+      body {
+        font-family: sans-serif, monospace;
+        margin: 1em auto 4em auto;
+        position: relative;
+        width: 1440px;
+      }
+
+      svg {
+        font: 10px sans-serif;
+      }
+
+      .axis path,
+      .axis line {
+        fill: none;
+        stroke: #000;
+        shape-rendering: crispEdges;
+      }
 
       .x.axis line {
         shape-rendering: auto;
@@ -19,6 +36,7 @@
       .error {
         color: red;
       }
+
       #peercontainer {
         display: flex;
         gap: 10px;
@@ -345,6 +363,7 @@
             conn.close()
             conn = new RTCPeerConnection(rtc_configuration)
           }
+          bitrates = {}
           callCreateTriggered = false
 
           // Reset after a second
@@ -468,7 +487,6 @@
           setError("Browser doesn't support getUserMedia!")
         }
       }
-
       const getIpVersion = (ip) => (/^(\d{1,3}\.){3}\d{1,3}$/.test(ip) ? 'IPv4' : 'IPv6')
 
       const resolveStats = (stats, obj, keys) => {
@@ -492,114 +510,92 @@
         resolveStats(stats, rtp, ['codec', 'playout', 'mediaSource', 'remote', 'transport'])
         if (rtp.remote && rtp.remote.codecId) rtp.remote.codec = stats.get(rtp.remote.codecId)
         if (rtp.transport) rtp.transport = transport(stats, stats.get(rtp.transportId))
-        return rtp
+        return JSON.stringify(rtp, null, 2).replaceAll('"', '')
       }
 
       const prev = {}
-      const performance = {}
-
-      const reproductionTime = (latestTimestamp) => {
-        if (!start_timestamp) return 'N/A'
-        const elapsedTime = latestTimestamp - start_timestamp
-        if (elapsedTime < 0) return 'N/A'
-        const totalSeconds = Math.floor(elapsedTime / 1000)
-        const minutes = Math.floor(totalSeconds / 60)
-        const seconds = totalSeconds % 60
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`
-      }
+      var bitrates = {}
 
       const measureStreamingMetrics = (report) => {
-        let totalBytes = 0
-        let totalFrames = 0
-        let latestTimestamp = 0
+        let totalBytes = 0,
+          totalFrames = 0,
+          latestTimestamp = 0
         const { type, kind } = report
         let key = `${type}-${kind}`
-
-        if (kind !== 'audio') {
-          totalFrames = 0
-        }
-
+        if (kind !== 'audio') totalFrames = 0
         if (type === 'inbound-rtp') {
           const { bytesReceived, framesDecoded, timestamp } = report
           totalBytes += bytesReceived
-          if (kind !== 'audio') {
-            totalFrames += framesDecoded
-          }
+          if (kind !== 'audio') totalFrames += framesDecoded
           latestTimestamp = Math.max(latestTimestamp, timestamp || 0)
-        }
-
-        if (type === 'outbound-rtp') {
+        } else if (type === 'outbound-rtp') {
           const { bytesSent, framesEncoded, timestamp } = report
           totalBytes += bytesSent
-          if (kind !== 'audio') {
-            totalFrames += framesEncoded
-          }
+          if (kind !== 'audio') totalFrames += framesEncoded
           latestTimestamp = Math.max(latestTimestamp, timestamp || 0)
         }
-
         const prevEntry = prev[key] || { totalBytes: 0, totalFrames: 0, latestTimestamp: 0 }
         const timeDiff = latestTimestamp - prevEntry.latestTimestamp
-
         if (timeDiff <= 0) return prev[key]
-
         const bytesDiff = totalBytes - prevEntry.totalBytes
         const framesDiff = totalFrames - prevEntry.totalFrames
         const bitrate = (bytesDiff * 8) / (timeDiff / 1000)
         const fps = kind !== 'audio' ? framesDiff / (timeDiff / 1000) : 0
-
         prev[key] = { fps, bitrate, totalBytes, totalFrames, latestTimestamp }
-
-        performance[key] = {
+        var reproductionTime = '0:00'
+        if (start_timestamp) {
+          const elapsedTime = latestTimestamp - start_timestamp
+          if (elapsedTime > 0) {
+            const totalSeconds = Math.floor(elapsedTime / 1000)
+            const minutes = Math.floor(totalSeconds / 60)
+            const seconds = totalSeconds % 60
+            reproductionTime = `${minutes}:${seconds.toString().padStart(2, '0')}`
+          }
+        }
+        return {
           fps: fps.toFixed(2),
           bitrate: (bitrate / 1000000).toFixed(2), // bps -> Mbps
-          totalBytes: (totalBytes / (1024 * 1024)).toFixed(2),
+          totalBytes: (totalBytes / (1024 * 1024)).toFixed(2), // byte -> Mbyte
           totalFrames: totalFrames.toLocaleString(),
-          reproductionTime: reproductionTime(latestTimestamp),
+          reproductionTime: reproductionTime,
+        }
+      }
+
+      const metricsDisplay = (stats, report) => {
+        const { type, kind } = report
+        const key = `${type}-${kind}`
+        if (kind === 'video') {
+          $(key).innerText = rtp(stats, report)
+          const metrics = measureStreamingMetrics(report)
+          bitrates[key] = metrics.bitrate
+          $(`${key}-chart`).firstChild.data = `${key}　　ReproductionTime:${metrics.reproductionTime}　Speed:${metrics.bitrate}Mbps　TotalBytes:${metrics.totalBytes}MB　FPS:${metrics.fps}　TotalFrames:${metrics.totalFrames}`
+        }
+        if (kind === 'audio') {
+          $(key).innerText = rtp(stats, report)
+          const metrics = measureStreamingMetrics(report)
+          bitrates[key] = metrics.bitrate
+          $(`${key}-chart`).firstChild.data = `${key}　　ReproductionTime:${metrics.reproductionTime}　Speed:${metrics.bitrate}Mbps　TotalBytes:${metrics.totalBytes}MB`
         }
       }
 
       setInterval(async () => {
-        if (!conn) return
+        if (!conn || conn.connectionState != 'connected' || conn.iceConnectionState != 'connected') return
 
-        let PeerConnection = null
-        const DataChannels = []
+        let peer = null
+        const dataChannels = []
         const stats = await conn.getStats(null)
 
         stats.forEach((report) => {
           switch (report.type) {
             case 'inbound-rtp':
-              if (report.kind === 'video') {
-                $('inbound-rtp-video').innerText = JSON.stringify(rtp(stats, report), null, 2).replaceAll('"', '')
-                const metrics = performance['inbound-rtp-video'] || { fps: 0, bitrate: 0, totalBytes: 0, totalFrames: 0, reproductionTime: '00:00' }
-                $('inbound-rtp-video-chart').firstChild.data = `Inbound RTP Video　　ReproductionTime:${metrics.reproductionTime}　FPS:${metrics.fps}　Speed:${metrics.bitrate}Mbps　TotalBytes:${metrics.totalBytes}MB　TotalFrames:${metrics.totalFrames}`
-              }
-              if (report.kind === 'audio') {
-                $('inbound-rtp-audio').innerText = JSON.stringify(rtp(stats, report), null, 2).replaceAll('"', '')
-                const metrics = performance['inbound-rtp-audio'] || { fps: 0, bitrate: 0, totalBytes: 0, totalFrames: 0, reproductionTime: '00:00' }
-                $('inbound-rtp-audio-chart').firstChild.data = `Inbound RTP Audio　　ReproductionTime:${metrics.reproductionTime}　Speed:${metrics.bitrate}Mbps　TotalBytes:${metrics.totalBytes}MB`
-              }
-              measureStreamingMetrics(report)
-              // console.log(`Inbound RTP(${report.kind}):`, rtp(stats, report))
-              break
             case 'outbound-rtp':
-              if (report.kind === 'video') {
-                $('outbound-rtp-video').innerText = JSON.stringify(rtp(stats, report), null, 2).replaceAll('"', '')
-                const metrics = performance['outbound-rtp-video'] || { fps: 0, bitrate: 0, totalBytes: 0, totalFrames: 0, reproductionTime: '00:00' }
-                $('outbound-rtp-video-chart').firstChild.data = `Outbound RTP Video　　ReproductionTime:${metrics.reproductionTime}　FPS:${metrics.fps}　Speed:${metrics.bitrate}Mbps　TotalBytes:${metrics.totalBytes}MB　TotalFrames:${metrics.totalFrames}`
-              }
-              if (report.kind === 'audio') {
-                $('outbound-rtp-audio').innerText = JSON.stringify(rtp(stats, report), null, 2).replaceAll('"', '')
-                const metrics = performance['outbound-rtp-audio'] || { fps: 0, bitrate: 0, totalBytes: 0, totalFrames: 0, reproductionTime: '00:00' }
-                $('outbound-rtp-audio-chart').firstChild.data = `Outbound RTP Audio　　ReproductionTime:${metrics.reproductionTime}　Speed:${metrics.bitrate}Mbps　TotalBytes:${metrics.totalBytes}MB`
-              }
-              measureStreamingMetrics(report)
-              // console.log(`Outbound RTP(${report.kind}):`, rtp(stats, report))
+              metricsDisplay(stats, report)
               break
             case 'peer-connection':
-              PeerConnection = report
+              peer = report
               break
             case 'data-channel':
-              DataChannels.push(report)
+              dataChannels.push(report)
               break
             default:
               if (!['candidate-pair', 'local-candidate', 'remote-candidate', 'remote-inbound-rtp', 'remote-outbound-rtp', 'transport', 'media-source', 'media-playout', 'certificate', 'codec'].includes(report.type)) {
@@ -608,10 +604,9 @@
           }
         })
 
-        if (PeerConnection) {
-          PeerConnection.dataChannels = DataChannels
-          $('peer-connection').innerText = JSON.stringify(rtp(stats, PeerConnection), null, 2).replaceAll('"', '')
-          // console.log('Peer Connection:', PeerConnection)
+        if (peer) {
+          peer.dataChannels = dataChannels
+          $('peer-connection').innerText = JSON.stringify(peer, null, 2).replaceAll('"', '')
         }
       }, 1000)
     </script>
@@ -649,11 +644,9 @@
             ;(() => {
               var transition = d3.select({}).transition().duration(750).ease('linear')
               chart('#inbound-rtp-video-chart', [1, n - 2], [0, 0.2], 'basis', function tick(path, line, data, x) {
-                // roundUpToNearestHalf(d3.max(data))
                 transition = transition
                   .each(() => {
-                    const metrics = performance['inbound-rtp-video'] || { bitrate: 0 }
-                    data.push(metrics.bitrate)
+                    data.push(bitrates['inbound-rtp-video'] || 0)
                     path
                       .attr('d', line)
                       .attr('transform', null)
@@ -675,8 +668,7 @@
               chart('#inbound-rtp-audio-chart', [1, n - 2], [0, 0.2], 'basis', function tick(path, line, data, x) {
                 transition = transition
                   .each(() => {
-                    const metrics = performance['inbound-rtp-audio'] || { bitrate: 0 }
-                    data.push(metrics.bitrate)
+                    data.push(bitrates['inbound-rtp-audio'] || 0)
                     path
                       .attr('d', line)
                       .attr('transform', null)
@@ -698,8 +690,7 @@
               chart('#outbound-rtp-video-chart', [1, n - 2], [0, 3], 'basis', function tick(path, line, data, x) {
                 transition = transition
                   .each(() => {
-                    const metrics = performance['outbound-rtp-video'] || { bitrate: 0 }
-                    data.push(metrics.bitrate)
+                    data.push(bitrates['outbound-rtp-video'] || 0)
                     path
                       .attr('d', line)
                       .attr('transform', null)
@@ -721,8 +712,7 @@
               chart('#outbound-rtp-audio-chart', [1, n - 2], [0, 0.2], 'basis', function tick(path, line, data, x) {
                 transition = transition
                   .each(() => {
-                    const metrics = performance['outbound-rtp-audio'] || { bitrate: 0 }
-                    data.push(metrics.bitrate)
+                    data.push(bitrates['outbound-rtp-audio'] || 0)
                     path
                       .attr('d', line)
                       .attr('transform', null)
@@ -739,10 +729,22 @@
       </div>
     </div>
     <div id="ctatisticscontainer">
-      <div>Inbound RTP Video<pre id="inbound-rtp-video"></pre></div>
-      <div>Inbound RTP Audio<pre id="inbound-rtp-audio"></pre></div>
-      <div>Outbound RTP Video<pre id="outbound-rtp-video"></pre></div>
-      <div>Outbound RTP Audio<pre id="outbound-rtp-audio"></pre></div>
+      <div>
+        Inbound RTP Video
+        <pre id="inbound-rtp-video"></pre>
+      </div>
+      <div>
+        Inbound RTP Audio
+        <pre id="inbound-rtp-audio"></pre>
+      </div>
+      <div>
+        Outbound RTP Video
+        <pre id="outbound-rtp-video"></pre>
+      </div>
+      <div>
+        Outbound RTP Audio
+        <pre id="outbound-rtp-audio"></pre>
+      </div>
     </div>
   </body>
 </html>
