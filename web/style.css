@@ -1,6 +1,6 @@
 /* Copyright 2013 Michael Bostock. All rights reserved. Do not copy. */
 
-@import url(//fonts.googleapis.com/css?family=PT+Serif|PT+Serif:b|PT+Serif:i|PT+Sans|PT+Sans:b);
+@import url(//fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;700&display=swap);
 
 html {
   min-width: 1040px;
@@ -9,7 +9,7 @@ html {
 .ocks-org body {
   background: #fcfcfa;
   color: #333;
-  font-family: 'PT Serif', serif;
+  font-family: 'Source Code Pro', monospace;
   margin: 1em auto 4em auto;
   position: relative;
   width: 1440px;
@@ -22,7 +22,7 @@ html {
 .ocks-org h2,
 .ocks-org h3,
 .ocks-org h4 {
-  font-family: 'PT Sans', sans-serif;
+  font-family: 'Source Code Pro', monospace;
 }
 
 .ocks-org h1,
@@ -132,7 +132,7 @@ a:not(:hover) {
 pre,
 code,
 textarea {
-  font-family: 'Menlo', monospace;
+  font-family: 'Source Code Pro', monospace;
 }
 
 code {
