@@ -112,7 +112,6 @@ void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConne
   //     "rtpopuspay pt=" RTP_AUDIO_PAYLOAD_TYPE " ! "
   //     "application/x-rtp,encoding-name=OPUS ! "
   //     "webrtcbin. ");
-
 pipeline_desc = g_strdup_printf( //
     "webrtcbin name=webrtcbin " VIDEO_SRC " ! "
     "videorate ! "
@@ -120,9 +119,9 @@ pipeline_desc = g_strdup_printf( //
     "video/x-raw,width=960,height=540,framerate=15/1 ! "
     "videoconvert ! "
     "queue max-size-buffers=1 ! "
-    "vtenc_h264_hw bitrate=2000 realtime=true allow-frame-reordering=false max-keyframe-interval=15 max-keyframe-interval-duration=1000000000 qos=true ! "
+    "vtenc_h264_hw realtime=true allow-frame-reordering=false max-keyframe-interval=15 qos=true ! "
     "video/x-h264, stream-format=avc, alignment=au ! "
-    "queue max-size-time=50000000 ! "
+    "queue ! "
     "h264parse config-interval=1 ! "
     "video/x-h264, level=(string)5.2 !"
     "rtph264pay config-interval=-1 name=payloader aggregate-mode=zero-latency ! "
@@ -157,28 +156,6 @@ pipeline_desc = g_strdup_printf( //
   //     "opusenc perfect-timestamp=true ! "
   //     "rtpopuspay pt=" RTP_AUDIO_PAYLOAD_TYPE " ! "
   //     "application/x-rtp, encoding-name=OPUS ! "
-  //     "webrtcbin. ");
-  // pipeline_desc = g_strdup_printf( //
-  //     "webrtcbin name=webrtcbin " VIDEO_SRC " ! "
-  //     "videorate ! "
-  //     "videoscale ! "
-  //     "video/x-raw,width=960,height=540,framerate=15/1 ! "
-  //     "videoconvert ! "
-  //     "queue max-size-buffers=1 ! "
-  //     "x265enc bitrate=600 speed-preset=ultrafast key-int-max=15 tune=zerolatency ! "
-  //     "video/x-h265,profile=main ! "
-  //     "queue max-size-time=100000000 ! "
-  //     "h265parse ! "
-  //     "rtph265pay config-interval=-1 name=payloader aggregate-mode=zero-latency ! "
-  //     "application/x-rtp,media=video,encoding-name=H265,payload=" RTP_PAYLOAD_TYPE " ! "
-  //     "webrtcbin. "
-  //     "autoaudiosrc ! "
-  //     "queue max-size-buffers=1 leaky=downstream ! "
-  //     "audioconvert ! "
-  //     "audioresample ! "
-  //     "opusenc perfect-timestamp=true ! "
-  //     "rtpopuspay pt=" RTP_AUDIO_PAYLOAD_TYPE " ! "
-  //     "application/x-rtp,encoding-name=OPUS ! "
   //     "webrtcbin. ");
   error = NULL;
   receiver_entry->pipeline = gst_parse_launch(pipeline_desc, &error);
