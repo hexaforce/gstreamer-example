@@ -22,45 +22,13 @@
         <div id="inbound-rtp-video-chart">
           Inbound RTP Video
           <script>
-            ;(() => {
-              var transition = d3.select({}).transition().duration(750).ease('linear')
-              chart('#inbound-rtp-video-chart', [1, n - 2], [0, 1.5], 'basis', function tick(path, line, data, x) {
-                transition = transition
-                  .each(() => {
-                    data.push(bitrates['inbound-rtp-video'] || 0)
-                    path
-                      .attr('d', line)
-                      .attr('transform', null)
-                      .transition()
-                      .attr('transform', 'translate(' + x(0) + ')')
-                    data.shift()
-                  })
-                  .transition()
-                  .each('start', () => tick(path, line, data, x))
-              })
-            })()
+            ;(() => renderingChart('inbound-rtp-video', [0, 1.8]))()
           </script>
         </div>
         <div id="inbound-rtp-audio-chart">
           Inbound RTP Audio
           <script>
-            ;(() => {
-              var transition = d3.select({}).transition().duration(750).ease('linear')
-              chart('#inbound-rtp-audio-chart', [1, n - 2], [0, 0.2], 'basis', function tick(path, line, data, x) {
-                transition = transition
-                  .each(() => {
-                    data.push(bitrates['inbound-rtp-audio'] || 0)
-                    path
-                      .attr('d', line)
-                      .attr('transform', null)
-                      .transition()
-                      .attr('transform', 'translate(' + x(0) + ')')
-                    data.shift()
-                  })
-                  .transition()
-                  .each('start', () => tick(path, line, data, x))
-              })
-            })()
+            ;(() => renderingChart('inbound-rtp-audio', [0, 0.2]))()
           </script>
         </div>
       </div>

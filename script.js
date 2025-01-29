@@ -42,9 +42,9 @@ const prev = {}
 var bitrates = {}
 
 const measureStreamingMetrics = (report) => {
-  let totalBytes = 0,
-    totalFrames = 0,
-    latestTimestamp = 0
+  let totalBytes = 0
+  let totalFrames = 0
+  let latestTimestamp = 0
   const { type, kind } = report
   let key = `${type}-${kind}`
   if (kind !== 'audio') totalFrames = 0
@@ -103,34 +103,6 @@ const metricsDisplay = (stats, report) => {
   }
 }
 
-var n = 40,
-  random = d3.random.normal(0, 0)
-
-function chart(id, xdomain, ydomain, interpolation, tick) {
-  var data = d3.range(n).map(random)
-  var margin = { top: 6, right: 0, bottom: 6, left: 40 },
-    width = 960 - margin.right,
-    height = 120 - margin.top - margin.bottom
-  var x = d3.scale.linear().domain(xdomain).range([0, width])
-  var y = d3.scale.linear().domain(ydomain).range([height, 0])
-  var line = d3.svg
-    .line()
-    .interpolate(interpolation)
-    .x((d, i) => {
-      return x(i)
-    })
-    .y((d, i) => {
-      return y(d)
-    })
-  var svg = d3.select(id).append('p').append('svg')
-  svg.attr('width', width + margin.left + margin.right).attr('height', height + margin.top + margin.bottom)
-  svg.append('g').attr('transform', 'translate(' + margin.left + ',' + margin.top + ')')
-  svg.append('defs').append('clipPath').attr('id', 'clip').append('rect').attr('width', width).attr('height', height)
-  svg.append('g').attr('class', 'y axis').call(d3.svg.axis().scale(y).ticks(5).orient('left'))
-  var path = svg.append('g').attr('clip-path', 'url(#clip)').append('path').datum(data).attr('class', 'line').attr('d', line)
-  tick(path, line, data, x)
-}
-
 var conn
 var startTimestamp
 
@@ -175,6 +147,33 @@ const load = () => {
   })
 }
 
+var n = 40, random = d3.random.normal(0, 0)
+
+const chart = (id, xdomain, ydomain, interpolation, tick) => {
+  var data = d3.range(n).map(random)
+  var margin = { top: 6, right: 0, bottom: 6, left: 40 },
+    width = 960 - margin.right,
+    height = 120 - margin.top - margin.bottom
+  var x = d3.scale.linear().domain(xdomain).range([0, width])
+  var y = d3.scale.linear().domain(ydomain).range([height, 0])
+  var line = d3.svg
+    .line()
+    .interpolate(interpolation)
+    .x((d, i) => {
+      return x(i)
+    })
+    .y((d, i) => {
+      return y(d)
+    })
+  var svg = d3.select(id).append('p').append('svg')
+  svg.attr('width', width + margin.left + margin.right).attr('height', height + margin.top + margin.bottom)
+  svg.append('g').attr('transform', 'translate(' + margin.left + ',' + margin.top + ')')
+  svg.append('defs').append('clipPath').attr('id', 'clip').append('rect').attr('width', width).attr('height', height)
+  svg.append('g').attr('class', 'y axis').call(d3.svg.axis().scale(y).ticks(5).orient('left'))
+  var path = svg.append('g').attr('clip-path', 'url(#clip)').append('path').datum(data).attr('class', 'line').attr('d', line)
+  tick(path, line, data, x)
+}
+
 const interval = async () => {
   if (!conn || conn.connectionState != 'connected' || conn.iceConnectionState != 'connected') return
 
@@ -205,4 +204,22 @@ const interval = async () => {
     peer.dataChannels = dataChannels
     $('peer-connection').innerText = JSON.stringify(peer, null, 2).replaceAll('"', '')
   }
+}
+
+const renderingChart = (key, yDomain) => {
+  var transition = d3.select({}).transition().duration(750).ease('linear')
+  chart(`#${key}-chart`, [1, n - 2], yDomain, 'basis', function tick(path, line, data, x) {
+    transition = transition
+      .each(() => {
+        data.push(bitrates[key] || 0)
+        path
+          .attr('d', line)
+          .attr('transform', null)
+          .transition()
+          .attr('transform', 'translate(' + x(0) + ')')
+        data.shift()
+      })
+      .transition()
+      .each('start', () => tick(path, line, data, x))
+  })
 }
