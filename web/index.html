@@ -212,6 +212,8 @@
       }
 
       window.onload = function websocketServerConnect() {
+        $('video-capabilities').innerText = JSON.stringify(RTCRtpSender.getCapabilities("video"), null, 2).replaceAll('"', '')
+        $('audio-capabilities').innerText = JSON.stringify(RTCRtpSender.getCapabilities("audio"), null, 2).replaceAll('"', '')
         connect_attempts++
 
         if (connect_attempts > 3) {
@@ -725,7 +727,7 @@
     <br />
     <div>
       <div>getUserMedia constraints being used:</div>
-      <div><textarea id="constraints" cols="40" rows="4"></textarea></div>
+      <div><textarea id="constraints" cols="40" rows="1"></textarea></div>
     </div>
     <div id="peercontainer">
       <div>
@@ -821,6 +823,16 @@
             })()
           </script>
         </div>
+      </div>
+    </div>
+    <div id="ctatisticscontainer">
+      <div>
+        Video Capabilities
+        <pre id="video-capabilities"></pre>
+      </div>
+      <div>
+        Audio Capabilities
+        <pre id="audio-capabilities"></pre>
       </div>
     </div>
     <div id="ctatisticscontainer">
