@@ -339,6 +339,7 @@ gchar *read_file(const gchar *path) {
   }
   return content;
 }
+
 void soup_http_handler(G_GNUC_UNUSED SoupServer *soup_server, SoupMessage *message, const char *path, G_GNUC_UNUSED GHashTable *query, G_GNUC_UNUSED SoupClientContext *client_context, G_GNUC_UNUSED gpointer user_data) {
   SoupBuffer *soup_buffer = NULL;
   gchar *file_content = NULL;
