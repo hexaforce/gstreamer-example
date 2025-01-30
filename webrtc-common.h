@@ -50,6 +50,8 @@ void soup_http_handler(G_GNUC_UNUSED SoupServer *soup_server, SoupMessage *messa
 
 void connect_data_channel_signals(GObject *data_channel);
 
+gboolean webrtcbin_get_stats(GstElement *webrtcbin);
+
 G_END_DECLS
 
 #endif /* __WEBRTC_COMMON_H__ */

@@ -340,36 +340,36 @@ gchar *read_file(const gchar *path) {
   return content;
 }
 void soup_http_handler(G_GNUC_UNUSED SoupServer *soup_server, SoupMessage *message, const char *path, G_GNUC_UNUSED GHashTable *query, G_GNUC_UNUSED SoupClientContext *client_context, G_GNUC_UNUSED gpointer user_data) {
-    SoupBuffer *soup_buffer = NULL;
-    gchar *file_content = NULL;
-    if (g_strcmp0(path, "/") == 0) {
-        path = "/index.html";
-    }
-    gchar *file_path = g_strdup_printf(".%s", path);
-    GError *error = NULL;
-    gsize file_size = 0;
-    if (!g_file_get_contents(file_path, &file_content, &file_size, &error)) {
-        soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
-        g_free(file_path);
-        if (error != NULL) {
-            g_error_free(error);
-        }
-        return;
-    }
-    soup_buffer = soup_buffer_new(SOUP_MEMORY_TAKE, file_content, file_size);
-    soup_message_body_append_buffer(message->response_body, soup_buffer);
-    soup_buffer_free(soup_buffer);
-    const char *content_type = "text/html";
-    if (g_str_has_suffix(file_path, ".css")) {
-        content_type = "text/css";
-    } else if (g_str_has_suffix(file_path, ".js")) {
-        content_type = "application/javascript";
-    } else if (g_str_has_suffix(file_path, ".ico")) {
-        content_type = "image/x-icon";
-    }
-    soup_message_headers_set_content_type(message->response_headers, content_type, NULL);
-    soup_message_set_status(message, SOUP_STATUS_OK);
+  SoupBuffer *soup_buffer = NULL;
+  gchar *file_content = NULL;
+  if (g_strcmp0(path, "/") == 0) {
+    path = "/index.html";
+  }
+  gchar *file_path = g_strdup_printf(".%s", path);
+  GError *error = NULL;
+  gsize file_size = 0;
+  if (!g_file_get_contents(file_path, &file_content, &file_size, &error)) {
+    soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
     g_free(file_path);
+    if (error != NULL) {
+      g_error_free(error);
+    }
+    return;
+  }
+  soup_buffer = soup_buffer_new(SOUP_MEMORY_TAKE, file_content, file_size);
+  soup_message_body_append_buffer(message->response_body, soup_buffer);
+  soup_buffer_free(soup_buffer);
+  const char *content_type = "text/html";
+  if (g_str_has_suffix(file_path, ".css")) {
+    content_type = "text/css";
+  } else if (g_str_has_suffix(file_path, ".js")) {
+    content_type = "application/javascript";
+  } else if (g_str_has_suffix(file_path, ".ico")) {
+    content_type = "image/x-icon";
+  }
+  soup_message_headers_set_content_type(message->response_headers, content_type, NULL);
+  soup_message_set_status(message, SOUP_STATUS_OK);
+  g_free(file_path);
 }
 
 void data_channel_on_error(GObject *dc, gpointer user_data) {
@@ -397,4 +397,37 @@ void connect_data_channel_signals(GObject *data_channel) {
   g_signal_connect(data_channel, "on-open", G_CALLBACK(data_channel_on_open), NULL);
   g_signal_connect(data_channel, "on-close", G_CALLBACK(data_channel_on_close), NULL);
   g_signal_connect(data_channel, "on-message-string", G_CALLBACK(data_channel_on_message_string), NULL);
+}
+
+gboolean on_webrtcbin_stat(GQuark field_id, const GValue *value, gpointer unused) {
+  if (GST_VALUE_HOLDS_STRUCTURE(value)) {
+    GST_DEBUG("stat: \'%s\': %" GST_PTR_FORMAT, g_quark_to_string(field_id), gst_value_get_structure(value));
+  } else {
+    GST_FIXME("unknown field \'%s\' value type: \'%s\'", g_quark_to_string(field_id), g_type_name(G_VALUE_TYPE(value)));
+  }
+
+  return TRUE;
+}
+
+void on_webrtcbin_get_stats(GstPromise *promise, GstElement *webrtcbin) {
+  const GstStructure *stats;
+
+  g_return_if_fail(gst_promise_wait(promise) == GST_PROMISE_RESULT_REPLIED);
+
+  stats = gst_promise_get_reply(promise);
+  gst_structure_foreach(stats, on_webrtcbin_stat, NULL);
+
+  g_timeout_add(100, (GSourceFunc)webrtcbin_get_stats, webrtcbin);
+}
+
+gboolean webrtcbin_get_stats(GstElement *webrtcbin) {
+  GstPromise *promise;
+
+  promise = gst_promise_new_with_change_func((GstPromiseChangeFunc)on_webrtcbin_get_stats, webrtcbin, NULL);
+
+  GST_TRACE("emitting get-stats on %" GST_PTR_FORMAT, webrtcbin);
+  g_signal_emit_by_name(webrtcbin, "get-stats", NULL, promise);
+  gst_promise_unref(promise);
+
+  return G_SOURCE_REMOVE;
 }

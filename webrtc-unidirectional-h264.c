@@ -18,6 +18,11 @@ gchar *audio_priority = NULL;
 
 GObject *send_channel, *receive_channel;
 
+// GST_WEBRTC_PRIORITY_TYPE_VERY_LOW (1) – very-low
+// GST_WEBRTC_PRIORITY_TYPE_LOW (2) – low
+// GST_WEBRTC_PRIORITY_TYPE_MEDIUM (3) – medium
+// GST_WEBRTC_PRIORITY_TYPE_HIGH (4) – high
+
 void set_sender_priority(GstWebRTCRTPTransceiver *trans, gchar *_priority) {
   if (_priority) {
     GEnumClass *klass = (GEnumClass *)g_type_class_ref(GST_TYPE_WEBRTC_PRIORITY_TYPE);
@@ -184,6 +189,8 @@ void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConne
   }
 
   g_signal_connect(receiver_entry->webrtcbin, "on-data-channel", G_CALLBACK(on_data_channel), NULL);
+
+  g_timeout_add(100, (GSourceFunc)webrtcbin_get_stats, receiver_entry->webrtcbin);
 
   if (gst_element_set_state(receiver_entry->pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE)
     g_error("Could not start pipeline");
