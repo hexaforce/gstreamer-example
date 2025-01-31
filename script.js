@@ -113,6 +113,8 @@ const load = () => {
       const { type, data } = JSON.parse(event.data)
       if (!conn) {
         conn = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] })
+        // conn.addTransceiver("video", { direction: "recvonly" });
+        // conn.addTransceiver("audio", { direction: "recvonly" });
         messageChannel(conn.createDataChannel('control-command-channel', null))
         conn.ondatachannel = ({ channel }) => messageChannel(channel)
         conn.ontrack = ({ streams }) => (document.getElementById('stream').srcObject = streams[0])
@@ -130,6 +132,11 @@ const load = () => {
         await conn.setRemoteDescription(data)
         const desc = await conn.createAnswer()
         await conn.setLocalDescription(desc)
+        // await new Promise((resolve) => {
+        //   conn.onicegatheringstatechange = () => {
+        //     if (conn.iceGatheringState === "complete") resolve();
+        //   };
+        // });
         ws.send(JSON.stringify({ type: 'sdp', data: conn.localDescription }))
       } else if (type == 'ice') {
         await conn.addIceCandidate(new RTCIceCandidate(data))

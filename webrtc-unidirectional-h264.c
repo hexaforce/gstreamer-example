@@ -79,27 +79,27 @@ void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConne
   // "video/x-raw,width=640,height=360,framerate=15/1 ! "
 
   // === pipeline config =============================
-  // pipeline_desc = g_strdup_printf( //
-  //     "webrtcbin name=webrtcbin " VIDEO_SRC " ! "
-  //     "videorate ! "
-  //     "videoscale ! "
-  //     "video/x-raw,width=960,height=540,framerate=15/1 ! "
-  //     "videoconvert ! "
-  //     "queue max-size-buffers=1 ! "
-  //     "vp8enc target-bitrate=600000 deadline=1 keyframe-max-dist=15 ! "
-  //     "video/x-vp8 ! "
-  //     "queue max-size-time=100000000 ! "
-  //     "rtpvp8pay name=payloader ! "
-  //     "application/x-rtp,media=video,encoding-name=VP8,payload=" RTP_PAYLOAD_TYPE " ! "
-  //     "webrtcbin. "
-  //     "autoaudiosrc ! "
-  //     "queue max-size-buffers=1 leaky=downstream ! "
-  //     "audioconvert ! "
-  //     "audioresample ! "
-  //     "opusenc perfect-timestamp=true ! "
-  //     "rtpopuspay pt=" RTP_AUDIO_PAYLOAD_TYPE " ! "
-  //     "application/x-rtp, encoding-name=OPUS ! "
-  //     "webrtcbin. ");
+  pipeline_desc = g_strdup_printf( //
+      "webrtcbin name=webrtcbin " VIDEO_SRC " ! "
+      "videorate ! "
+      "videoscale ! "
+      "video/x-raw,width=960,height=540,framerate=15/1 ! "
+      "videoconvert ! "
+      "queue max-size-buffers=1 ! "
+      "vp8enc target-bitrate=600000 deadline=1 keyframe-max-dist=15 ! "
+      "video/x-vp8 ! "
+      "queue max-size-time=100000000 ! "
+      "rtpvp8pay name=payloader ! "
+      "application/x-rtp,media=video,encoding-name=VP8,payload=" RTP_PAYLOAD_TYPE " ! "
+      "webrtcbin. "
+      "autoaudiosrc ! "
+      "queue max-size-buffers=1 leaky=downstream ! "
+      "audioconvert ! "
+      "audioresample ! "
+      "opusenc perfect-timestamp=true ! "
+      "rtpopuspay pt=" RTP_AUDIO_PAYLOAD_TYPE " ! "
+      "application/x-rtp, encoding-name=OPUS ! "
+      "webrtcbin. ");
   // pipeline_desc = g_strdup_printf( //
   //     "webrtcbin name=webrtcbin " VIDEO_SRC " ! "
   //     "videorate ! video/x-raw,framerate=30/1 ! "
@@ -117,29 +117,29 @@ void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConne
   //     "rtpopuspay pt=" RTP_AUDIO_PAYLOAD_TYPE " ! "
   //     "application/x-rtp,encoding-name=OPUS ! "
   //     "webrtcbin. ");
-  pipeline_desc = g_strdup_printf( //
-      "webrtcbin name=webrtcbin " VIDEO_SRC " ! "
-      "videorate ! "
-      "videoscale ! "
-      "video/x-raw,width=960,height=540,framerate=15/1 ! "
-      "videoconvert ! "
-      "queue max-size-buffers=1 ! "
-      "vtenc_h264_hw realtime=true allow-frame-reordering=false max-keyframe-interval=15 qos=true ! "
-      "video/x-h264, stream-format=avc, alignment=au ! "
-      "queue ! "
-      "h264parse config-interval=1 ! "
-      "video/x-h264, level=(string)5.2 !"
-      "rtph264pay config-interval=-1 name=payloader aggregate-mode=zero-latency ! "
-      "application/x-rtp,media=video,encoding-name=H264,payload=" RTP_PAYLOAD_TYPE " ! "
-      "webrtcbin. "
-      "osxaudiosrc ! "
-      "queue max-size-buffers=1 leaky=downstream ! "
-      "audioconvert ! "
-      "audioresample ! "
-      "opusenc perfect-timestamp=true ! "
-      "rtpopuspay pt=" RTP_AUDIO_PAYLOAD_TYPE " ! "
-      "application/x-rtp, encoding-name=OPUS ! "
-      "webrtcbin. ");
+  // pipeline_desc = g_strdup_printf( //
+  //     "webrtcbin name=webrtcbin " VIDEO_SRC " ! "
+  //     "videorate ! "
+  //     "videoscale ! "
+  //     "video/x-raw,width=960,height=540,framerate=15/1 ! "
+  //     "videoconvert ! "
+  //     "queue max-size-buffers=1 ! "
+  //     "vtenc_h264_hw realtime=true allow-frame-reordering=false max-keyframe-interval=15 qos=true ! "
+  //     "video/x-h264, stream-format=avc, alignment=au ! "
+  //     "queue ! "
+  //     "h264parse config-interval=1 ! "
+  //     "video/x-h264, level=(string)5.2 !"
+  //     "rtph264pay config-interval=-1 name=payloader aggregate-mode=zero-latency ! "
+  //     "application/x-rtp,media=video,encoding-name=H264,payload=" RTP_PAYLOAD_TYPE " ! "
+  //     "webrtcbin. "
+  //     "osxaudiosrc ! "
+  //     "queue max-size-buffers=1 leaky=downstream ! "
+  //     "audioconvert ! "
+  //     "audioresample ! "
+  //     "opusenc perfect-timestamp=true ! "
+  //     "rtpopuspay pt=" RTP_AUDIO_PAYLOAD_TYPE " ! "
+  //     "application/x-rtp, encoding-name=OPUS ! "
+  //     "webrtcbin. ");
 
   error = NULL;
   receiver_entry->pipeline = gst_parse_launch(pipeline_desc, &error);
@@ -151,6 +151,7 @@ void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConne
 
   receiver_entry->webrtcbin = gst_bin_get_by_name(GST_BIN(receiver_entry->pipeline), "webrtcbin");
   g_assert_nonnull(receiver_entry->webrtcbin);
+  // gst_util_set_object_arg(G_OBJECT(receiver_entry->webrtcbin), "use-media-library", TRUE);
   gst_util_set_object_arg(G_OBJECT(receiver_entry->webrtcbin), "bundle-policy", "max-bundle");
   gst_util_set_object_arg(G_OBJECT(receiver_entry->webrtcbin), "stun-server", "stun://" STUN_SERVER);
 
