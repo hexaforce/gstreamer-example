@@ -649,7 +649,6 @@
                   gatheringState: receiver.iceTransport.gatheringState,
                 }
               : null,
-            parameters: receiver.getParameters(),
           }
           $(`receiver${index}`).innerText = JSON.stringify(receiverInfo, null, 2).replaceAll('"', '')
         })
