@@ -211,9 +211,19 @@
         span.classList.add('error')
       }
 
+      function sortByMimeTypes(codecs, preferredOrder) {
+        return codecs.sort((a, b) => {
+          const indexA = preferredOrder.indexOf(a.mimeType)
+          const indexB = preferredOrder.indexOf(b.mimeType)
+          const orderA = indexA >= 0 ? indexA : Number.MAX_VALUE
+          const orderB = indexB >= 0 ? indexB : Number.MAX_VALUE
+          return orderA - orderB
+        })
+      }
+
       window.onload = function websocketServerConnect() {
-        $('video-capabilities').innerText = JSON.stringify(RTCRtpSender.getCapabilities("video"), null, 2).replaceAll('"', '')
-        $('audio-capabilities').innerText = JSON.stringify(RTCRtpSender.getCapabilities("audio"), null, 2).replaceAll('"', '')
+        $('video-capabilities').innerText = JSON.stringify(RTCRtpSender.getCapabilities('video'), null, 2).replaceAll('"', '')
+        $('audio-capabilities').innerText = JSON.stringify(RTCRtpSender.getCapabilities('audio'), null, 2).replaceAll('"', '')
         connect_attempts++
 
         if (connect_attempts > 3) {
@@ -312,6 +322,14 @@
 
                     await conn.setRemoteDescription(remoteDescription)
                     setStatus('Got SDP offer, waiting for getUserMedia to complete')
+
+                    const [transceiver0, videoTransceiver] = conn.getTransceivers()
+                    if (videoTransceiver) {
+                      const supportedCodecs = RTCRtpReceiver.getCapabilities('video').codecs
+                      const preferredCodecs = ['video/AV1', 'video/VP9', 'video/H265', 'video/H264', 'video/VP8']
+                      const sortedCodecs = sortByMimeTypes(supportedCodecs, preferredCodecs)
+                      videoTransceiver.setCodecPreferences(sortedCodecs)
+                    }
 
                     isSettingRemoteAnswerPending = false
                     if (msg.sdp.type == 'offer') {
@@ -656,7 +674,6 @@
                         iceTransportState: transceiver.sender.transport.iceTransport.state,
                       }
                     : null,
-                  parameters: transceiver.sender.getParameters(),
                 }
               : null,
             receiver: transceiver.receiver
@@ -674,7 +691,6 @@
                         iceTransportState: transceiver.receiver.transport.iceTransport.state,
                       }
                     : null,
-                  parameters: transceiver.receiver.getParameters(),
                 }
               : null,
             stopped: transceiver.stopped,
