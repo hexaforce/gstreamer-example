@@ -6,6 +6,8 @@
       var ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/ws`, 'transceiver')
       var conn = new RTCPeerConnection()
       conn.onicecandidate = ({ candidate }) => candidate && ws.send(JSON.stringify(candidate))
+      conn.ondatachannel = ({ channel }) => { console.log(channel) }
+      conn.createDataChannel('sensor-reading-channel')
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       stream.getTracks().forEach(track => {
         conn.addTrack(track, stream);
