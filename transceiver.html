@@ -10,9 +10,9 @@
       channel.onmessage = ({ data }) => console.log(channel.label + '.OnMessage', data)
     }
 
-    setInterval(async () => {
-      dataChannel[PROTOCOL].send(PROTOCOL)
-    }, 1000)
+    // setInterval(async () => {
+    //   dataChannel[PROTOCOL].send(PROTOCOL)
+    // }, 1000)
 
     window.onload = async () => {
       var ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/ws`, PROTOCOL)
