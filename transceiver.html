@@ -2,12 +2,21 @@
 
 <head>
   <script type='text/javascript'>
+    const PROTOCOL = 'transceiver'
+
+    const dataChannelHandler = (channel) => {
+      channel.onopen = ({ target }) => {
+        if (target.label === PROTOCOL) target.send("hello i am " + PROTOCOL)
+      }
+      channel.onmessage = ({ data }) => console.log(channel.label + '.OnMessage', data)
+    }
+
     window.onload = async () => {
-      var ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/ws`, 'transceiver')
+      var ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/ws`, PROTOCOL)
       var conn = new RTCPeerConnection()
       conn.onicecandidate = ({ candidate }) => candidate && ws.send(JSON.stringify(candidate))
-      conn.ondatachannel = ({ channel }) => { console.log(channel) }
-      conn.createDataChannel('sensor-reading-channel')
+      conn.ondatachannel = ({ channel }) => dataChannelHandler(channel)
+      dataChannelHandler(conn.createDataChannel(PROTOCOL))
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       stream.getTracks().forEach(track => {
         conn.addTrack(track, stream);
