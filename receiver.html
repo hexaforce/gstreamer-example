@@ -73,6 +73,125 @@
       text-align: center;
       padding: 10px;
     }
+
+    .overlay-gps {
+      position: absolute;
+      top: 0;
+      right: 0;
+      padding: 10px;
+      font-size: 18px;
+      color: white;
+      background: rgba(0, 0, 0, 0.3); /* 背景を半透明（透明にしたいなら transparent に変更） */
+      border-radius: 0 0 0 10px; /* 左下の角を丸くする */
+    }
+    
+    .overlay-compass {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      font-size: 18px;
+      color: white;
+      background: rgba(0, 0, 0, 0.3); /* 半透明の背景 */
+      border-radius: 0 0 10px 10px; /* 下の角を丸くする */
+    }
+
+    .hud {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 200px;
+      height: 200px;
+      border: 2px solid rgba(0, 255, 0, 0.7);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .crosshair {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+    }
+    .crosshair::before, 
+    .crosshair::after {
+      content: "";
+      position: absolute;
+      background: rgba(0, 255, 0, 0.7);
+    }
+    /* 縦ライン */
+    .crosshair::before {
+      width: 2px;
+      height: 100%;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    /* 横ライン */
+    .crosshair::after {
+      width: 100%;
+      height: 2px;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    /* コンパス全体 */
+    .compass {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 300px;
+      height: 50px;
+      overflow: hidden;
+      border: 2px solid rgba(0, 255, 0, 0.7);
+      border-radius: 5px;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    /* コンパスの目盛り */
+    .compass-scale {
+      display: flex;
+      position: relative;
+      white-space: nowrap;
+      font-family: Arial, sans-serif;
+      font-size: 18px;
+      color: rgba(0, 255, 0, 0.8);
+      animation: moveCompass 10s linear infinite; /* 自動スクロール */
+    }
+
+    /* 方向の目盛り */
+    .compass-scale span {
+      display: inline-block;
+      width: 50px;
+      text-align: center;
+    }
+
+    /* 現在の方向を示す中央のインジケーター */
+    .indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 22px;
+      font-weight: bold;
+      color: rgba(255, 255, 0, 0.9);
+    }
+
+    /* コンパスのアニメーション */
+    @keyframes moveCompass {
+      from {
+        transform: translateX(0);
+      }
+      to {
+        transform: translateX(-50px);
+      }
+    }
   </style>
 </head>
 
@@ -81,6 +200,17 @@
     <video id="stream" autoplay playsinline muted>Your browser does not support video</video>
     <div class="overlay">xxx</div>
     <div class="footer">zzzz</div>
+    <div class="overlay-gps">gps</div>
+    <!-- <div class="overlay-compass">cccc</div> -->
+    <div class="compass">
+      <div class="compass-scale">
+        <span>W</span><span>NW</span><span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span><span>SW</span><span>W</span>
+      </div>
+      <div class="indicator">▲</div> <!-- 現在の方向マーカー -->
+    </div>
+    <div class="hud">
+      <div class="crosshair"></div>
+    </div>
   </div>
 </body>
 

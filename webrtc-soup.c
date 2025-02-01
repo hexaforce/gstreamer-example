@@ -90,11 +90,11 @@ void soup_http_handler(G_GNUC_UNUSED SoupServer *soup_server, SoupMessage *messa
   soup_message_body_append_buffer(message->response_body, soup_buffer);
   soup_buffer_free(soup_buffer);
 
-  const char *content_type = "text/html";
+  const char *content_type = "text/html; charset=UTF-8";
   if (g_str_has_suffix(file_path, ".css")) {
-    content_type = "text/css";
+    content_type = "text/css; charset=UTF-8";
   } else if (g_str_has_suffix(file_path, ".js")) {
-    content_type = "application/javascript";
+    content_type = "application/javascript; charset=UTF-8";
   } else if (g_str_has_suffix(file_path, ".ico")) {
     content_type = "image/x-icon";
   }
