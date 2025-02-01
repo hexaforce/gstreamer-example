@@ -1,20 +1,24 @@
-#include "webrtc-common.h"
 
-#define RTP_PAYLOAD_TYPE "96"
-#define RTP_AUDIO_PAYLOAD_TYPE "97"
-#define SOUP_HTTP_PORT 57778
-#define STUN_SERVER "stun.l.google.com:19302"
+#include <glib.h>
+#include <locale.h>
 
-#ifdef G_OS_WIN32
-#define VIDEO_SRC "mfvideosrc"
-#elif defined(__APPLE__)
-#define VIDEO_SRC "avfvideosrc"
-#else
-#define VIDEO_SRC "v4l2src"
+#ifdef G_OS_UNIX
+#include <glib-unix.h>
 #endif
+
+#include <json-glib/json-glib.h>
+#include <libsoup/soup.h>
+
+#define SOUP_HTTP_PORT 57778
 
 SoupWebsocketConnection *receiver;
 SoupWebsocketConnection *transceiver;
+
+void soup_websocket_closed_cb(SoupWebsocketConnection *connection, gpointer user_data) {
+  GHashTable *receiver_entry_table = (GHashTable *)user_data;
+  g_hash_table_remove(receiver_entry_table, connection);
+  // gst_print("Closed websocket connection %p\n", (gpointer)connection);
+}
 
 void soup_websocket_message_cb2(G_GNUC_UNUSED SoupWebsocketConnection *connection, SoupWebsocketDataType data_type, GBytes *message, gpointer user_data) {
   gsize size;
@@ -54,19 +58,11 @@ void soup_websocket_message_cb2(G_GNUC_UNUSED SoupWebsocketConnection *connectio
 
   if (json_object_has_member(root_json_object, "type")) {
     type_string = json_object_get_string_member(root_json_object, "type");
-    if (json_object_has_member(root_json_object, "sdp")) {
-      GstSDPMessage *sdp;
-      int ret;
-      sdp_string = json_object_get_string_member(root_json_object, "sdp");
-      gst_print("Received SDP:\n%s\n", sdp_string);
-      ret = gst_sdp_message_new(&sdp);
-      g_assert_cmphex(ret, ==, GST_SDP_OK);
-    }
   } else {
     if (!json_object_has_member(root_json_object, "candidate")) {
       goto unknown_message;
     }
-    gst_print("Received ICE:\n%s\n", data_string);
+    // gst_print("Received ICE:\n%s\n", data_string);
   }
 
   const char *protocol = soup_websocket_connection_get_protocol(connection);
@@ -98,17 +94,17 @@ void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConne
   GHashTable *receiver_entry_table = (GHashTable *)user_data;
   const char *protocol = soup_websocket_connection_get_protocol(connection);
 
-  gst_print("protocol %s\n", protocol);
+  // gst_print("protocol %s\n", protocol);
 
   g_signal_connect(G_OBJECT(connection), "closed", G_CALLBACK(soup_websocket_closed_cb), (gpointer)receiver_entry_table);
 
   if (protocol) {
     if (g_strcmp0(protocol, "receiver") == 0) {
       receiver = connection;
-      gst_print("Processing new websocket connection %p\n", (gpointer)receiver);
+      // gst_print("Processing new websocket connection %p\n", (gpointer)receiver);
     } else if (g_strcmp0(protocol, "transceiver") == 0) {
       transceiver = connection;
-      gst_print("Processing new websocket connection %p\n", (gpointer)transceiver);
+      // gst_print("Processing new websocket connection %p\n", (gpointer)transceiver);
     }
   }
   g_object_ref(G_OBJECT(connection));
@@ -117,27 +113,75 @@ void soup_websocket_handler(G_GNUC_UNUSED SoupServer *server, SoupWebsocketConne
 
   g_hash_table_replace(receiver_entry_table, connection, connection);
   return;
+}
 
-  // cleanup:
-  //   destroy_receiver_entry((gpointer)receiver_entry);
+gchar *read_file(const gchar *path) {
+  GError *error = NULL;
+  gsize length = 0;
+  gchar *content = NULL;
+  if (!g_file_get_contents(path, &content, &length, &error)) {
+    g_error_free(error);
+    return NULL;
+  }
+  return content;
+}
+
+void soup_http_handler(G_GNUC_UNUSED SoupServer *soup_server, SoupMessage *message, const char *path, G_GNUC_UNUSED GHashTable *query, G_GNUC_UNUSED SoupClientContext *client_context, G_GNUC_UNUSED gpointer user_data) {
+  SoupBuffer *soup_buffer = NULL;
+  gchar *file_content = NULL;
+  if (g_strcmp0(path, "/") == 0) {
+    path = "/index.html";
+  }
+  gchar *file_path = g_strdup_printf(".%s", path);
+  GError *error = NULL;
+  gsize file_size = 0;
+  if (!g_file_get_contents(file_path, &file_content, &file_size, &error)) {
+    soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
+    g_free(file_path);
+    if (error != NULL) {
+      g_error_free(error);
+    }
+    return;
+  }
+  soup_buffer = soup_buffer_new(SOUP_MEMORY_TAKE, file_content, file_size);
+  soup_message_body_append_buffer(message->response_body, soup_buffer);
+  soup_buffer_free(soup_buffer);
+  const char *content_type = "text/html";
+  if (g_str_has_suffix(file_path, ".css")) {
+    content_type = "text/css";
+  } else if (g_str_has_suffix(file_path, ".js")) {
+    content_type = "application/javascript";
+  } else if (g_str_has_suffix(file_path, ".ico")) {
+    content_type = "image/x-icon";
+  }
+  soup_message_headers_set_content_type(message->response_headers, content_type, NULL);
+  soup_message_set_status(message, SOUP_STATUS_OK);
+  g_free(file_path);
+}
+
+void destroy_receiver_entry() {
+  if (receiver != NULL)
+    g_object_unref(G_OBJECT(receiver));
+
+  if (transceiver != NULL)
+    g_object_unref(G_OBJECT(transceiver));
 }
 
 #if defined(G_OS_UNIX) || defined(__APPLE__)
 gboolean exit_sighandler(gpointer user_data) {
-  gst_print("Caught signal, stopping mainloop\n");
+  // gst_print("Caught signal, stopping mainloop\n");
   GMainLoop *mainloop = (GMainLoop *)user_data;
   g_main_loop_quit(mainloop);
   return TRUE;
 }
 #endif
 
-int gst_main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
   GMainLoop *mainloop;
   SoupServer *soup_server;
   GHashTable *receiver_entry_table;
 
   setlocale(LC_ALL, "");
-  gst_debug_set_default_threshold(GST_LEVEL_WARNING);
 
   receiver_entry_table = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, destroy_receiver_entry);
 
@@ -155,9 +199,8 @@ int gst_main(int argc, char *argv[]) {
   soup_server_add_websocket_handler(soup_server, "/ws", NULL, protocols, soup_websocket_handler, (gpointer)receiver_entry_table, NULL);
   soup_server_listen_all(soup_server, SOUP_HTTP_PORT, (SoupServerListenOptions)0, NULL);
 
-  gst_print("WebRTC page link: http://127.0.0.1:%d/\n", (gint)SOUP_HTTP_PORT);
-  gst_print("WebRTC page link: http://127.0.0.1:%d/receiver.html\n", (gint)SOUP_HTTP_PORT);
-  gst_print("WebRTC page link: http://127.0.0.1:%d/transceiver.html\n", (gint)SOUP_HTTP_PORT);
+  // gst_print("WebRTC page link: http://127.0.0.1:%d/receiver.html\n", (gint)SOUP_HTTP_PORT);
+  // gst_print("WebRTC page link: http://127.0.0.1:%d/transceiver.html\n", (gint)SOUP_HTTP_PORT);
 
   g_main_loop_run(mainloop);
 
@@ -165,23 +208,5 @@ int gst_main(int argc, char *argv[]) {
   g_hash_table_destroy(receiver_entry_table);
   g_main_loop_unref(mainloop);
 
-  gst_deinit();
-
   return 0;
-}
-
-#ifdef __APPLE__
-int mac_main_function(int argc, char **argv, gpointer user_data) {
-  gst_init(&argc, &argv);
-  return gst_main(argc, argv);
-}
-#endif
-
-int main(int argc, char *argv[]) {
-#ifdef __APPLE__
-  gst_macos_main(mac_main_function, argc, argv, NULL);
-#else
-  gst_init(&argc, &argv);
-  return gst_main(argc, argv);
-#endif
 }

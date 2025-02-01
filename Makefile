@@ -17,7 +17,7 @@ webrtc-recvonly-h264: webrtc-recvonly-h264.c webrtc-common.c
 webrtc-sendrecv: webrtc-sendrecv.c custom_agent.c
 	"$(CC)" $(CFLAGS) $^ $(LIBS) -o $@
 
-webrtc-soup: webrtc-soup.c webrtc-common.c
+webrtc-soup: webrtc-soup.c
 	"$(CC)" $(CFLAGS) $^ $(LIBS) -o $@
 
 clean:
