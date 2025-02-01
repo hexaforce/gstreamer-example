@@ -2,7 +2,7 @@
 <head>
   <script type='text/javascript'>
     window.onload = () => {
-      var ws = new WebSocket(`${window.location}ws`, 'receiver')
+      var ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/ws`, 'receiver')
       var conn
       ws.onmessage = async ({ data }) => {
         if (!conn) {
@@ -17,7 +17,7 @@
           await conn.setLocalDescription(answer)
           ws.send(JSON.stringify(answer))
         } else {
-          await conn.addIceCandidate(new RTCIceCandidate(msg))
+          await conn.addIceCandidate(msg)
         }
       }
     }

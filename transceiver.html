@@ -2,7 +2,7 @@
 <head>
   <script type='text/javascript'>
     window.onload = async () => {
-      var ws = new WebSocket(`${window.location}ws`, 'transceiver')
+      var ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/ws`, 'transceiver')
       var conn = new RTCPeerConnection()
       conn.onicecandidate = ({ candidate }) => candidate && ws.send(JSON.stringify(candidate))
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
@@ -15,7 +15,7 @@
         if (msg.type) {
           await conn.setRemoteDescription(msg)
         } else {
-          await conn.addIceCandidate(new RTCIceCandidate(msg))
+          await conn.addIceCandidate(msg)
         }
       }
     }
