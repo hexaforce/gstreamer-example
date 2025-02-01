@@ -4,12 +4,15 @@
   <script type='text/javascript'>
     const PROTOCOL = 'transceiver'
 
+    const dataChannel = {}
     const dataChannelHandler = (channel) => {
-      channel.onopen = ({ target }) => {
-        if (target.label === PROTOCOL) target.send("hello i am " + PROTOCOL)
-      }
+      channel.onopen = ({ target }) => dataChannel[target.label] = target
       channel.onmessage = ({ data }) => console.log(channel.label + '.OnMessage', data)
     }
+
+    setInterval(async () => {
+      dataChannel[PROTOCOL].send(PROTOCOL)
+    }, 1000)
 
     window.onload = async () => {
       var ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/ws`, PROTOCOL)
