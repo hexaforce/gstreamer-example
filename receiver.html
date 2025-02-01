@@ -20,7 +20,7 @@
           conn.onicecandidate = ({ candidate }) => candidate && ws.send(JSON.stringify(candidate))
           conn.ondatachannel = ({ channel }) => dataChannelHandler(channel)
           dataChannelHandler(conn.createDataChannel(PROTOCOL))
-          conn.ontrack = ({ streams }) => (document.getElementById('stream').srcObject = streams[0])
+          conn.ontrack = ({ streams }) => ($('stream').srcObject = streams[0])
         }
         const msg = JSON.parse(data)
         if (msg.type) {
@@ -37,6 +37,13 @@
           await conn.addIceCandidate(msg)
         }
       }
+      $('fullscreen-btn').addEventListener('click', () => {
+        if (d.requestFullscreen) {
+          d.requestFullscreen()
+        } else if (d.webkitRequestFullscreen) {
+          d.webkitRequestFullscreen()
+        }
+      })
     }
   </script>
   <style>
@@ -81,20 +88,10 @@
       padding: 10px;
       font-size: 18px;
       color: white;
-      background: rgba(0, 0, 0, 0.3); /* 背景を半透明（透明にしたいなら transparent に変更） */
-      border-radius: 0 0 0 10px; /* 左下の角を丸くする */
-    }
-    
-    .overlay-compass {
-      position: absolute;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 10px 20px;
-      font-size: 18px;
-      color: white;
-      background: rgba(0, 0, 0, 0.3); /* 半透明の背景 */
-      border-radius: 0 0 10px 10px; /* 下の角を丸くする */
+      background: rgba(0, 0, 0, 0.3);
+      /* 背景を半透明（透明にしたいなら transparent に変更） */
+      border-radius: 0 0 0 10px;
+      /* 左下の角を丸くする */
     }
 
     .hud {
@@ -110,17 +107,20 @@
       align-items: center;
       justify-content: center;
     }
+
     .crosshair {
       position: absolute;
       width: 100%;
       height: 100%;
     }
-    .crosshair::before, 
+
+    .crosshair::before,
     .crosshair::after {
       content: "";
       position: absolute;
       background: rgba(0, 255, 0, 0.7);
     }
+
     /* 縦ライン */
     .crosshair::before {
       width: 2px;
@@ -129,6 +129,7 @@
       left: 50%;
       transform: translateX(-50%);
     }
+
     /* 横ライン */
     .crosshair::after {
       width: 100%;
@@ -137,6 +138,7 @@
       top: 50%;
       transform: translateY(-50%);
     }
+
     /* コンパス全体 */
     .compass {
       position: absolute;
@@ -153,7 +155,7 @@
       align-items: center;
       justify-content: center;
     }
-    
+
     /* コンパスの目盛り */
     .compass-scale {
       display: flex;
@@ -162,7 +164,8 @@
       font-family: Arial, sans-serif;
       font-size: 18px;
       color: rgba(0, 255, 0, 0.8);
-      animation: moveCompass 10s linear infinite; /* 自動スクロール */
+      animation: moveCompass 10s linear infinite;
+      /* 自動スクロール */
     }
 
     /* 方向の目盛り */
@@ -188,6 +191,7 @@
       from {
         transform: translateX(0);
       }
+
       to {
         transform: translateX(-50px);
       }
@@ -199,9 +203,8 @@
   <div class="container">
     <video id="stream" autoplay playsinline muted>Your browser does not support video</video>
     <div class="overlay">xxx</div>
-    <div class="footer">zzzz</div>
+    <div class="footer"><button id="fullscreen-btn">Go Fullscreen</button></div>
     <div class="overlay-gps">gps</div>
-    <!-- <div class="overlay-compass">cccc</div> -->
     <div class="compass">
       <div class="compass-scale">
         <span>W</span><span>NW</span><span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span><span>SW</span><span>W</span>

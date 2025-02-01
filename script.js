@@ -1,3 +1,6 @@
+const $ = (id) => document.getElementById(id)
+const d = document.documentElement
+
 const dataChannel = {};
 
 function dataChannelHandler(channel) {
