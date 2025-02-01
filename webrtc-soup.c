@@ -69,17 +69,14 @@ gchar *read_file(const gchar *path) {
 }
 
 void soup_http_handler(G_GNUC_UNUSED SoupServer *soup_server, SoupMessage *message, const char *path, G_GNUC_UNUSED GHashTable *query, G_GNUC_UNUSED SoupClientContext *client_context, G_GNUC_UNUSED gpointer user_data) {
-  SoupBuffer *soup_buffer = NULL;
-  gchar *file_content = NULL;
-
   if (g_strcmp0(path, "/") == 0) {
     path = "/index.html";
   }
 
   gchar *file_path = g_strdup_printf(".%s", path);
-  GError *error = NULL;
+  gchar *file_content = NULL;
   gsize file_size = 0;
-
+  GError *error = NULL;
   if (!g_file_get_contents(file_path, &file_content, &file_size, &error)) {
     soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
     g_free(file_path);
@@ -89,7 +86,7 @@ void soup_http_handler(G_GNUC_UNUSED SoupServer *soup_server, SoupMessage *messa
     return;
   }
 
-  soup_buffer = soup_buffer_new(SOUP_MEMORY_TAKE, file_content, file_size);
+  SoupBuffer *soup_buffer = soup_buffer_new(SOUP_MEMORY_TAKE, file_content, file_size);
   soup_message_body_append_buffer(message->response_body, soup_buffer);
   soup_buffer_free(soup_buffer);
 
