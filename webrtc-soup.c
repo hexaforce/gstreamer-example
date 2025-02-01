@@ -105,10 +105,14 @@ void soup_http_handler(G_GNUC_UNUSED SoupServer *soup_server, SoupMessage *messa
 }
 
 void destroy_entry() {
-  if (receiver != NULL)
+  if (G_IS_OBJECT(receiver)) {
     g_object_unref(G_OBJECT(receiver));
-  if (transceiver != NULL)
+    receiver = NULL;
+  }
+  if (G_IS_OBJECT(transceiver)) {
     g_object_unref(G_OBJECT(transceiver));
+    transceiver = NULL;
+  }
 }
 
 #if defined(G_OS_UNIX) || defined(__APPLE__)
