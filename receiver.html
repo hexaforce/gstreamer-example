@@ -1,220 +1,217 @@
 <html>
+  <head>
+    <link href="style.css" rel="stylesheet" />
+    <script src="script.js"></script>
+    <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script type="text/javascript">
+      const PROTOCOL = 'receiver'
 
-<head>
-  <link href="style.css" rel="stylesheet" />
-  <script src="script.js"></script>
-  <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
-  <script type='text/javascript'>
-    const PROTOCOL = 'receiver'
+      // setInterval(async () => {
+      //   dataChannel[PROTOCOL].send(PROTOCOL)
+      // }, 1000)
 
-    // setInterval(async () => {
-    //   dataChannel[PROTOCOL].send(PROTOCOL)
-    // }, 1000)
-
-    window.onload = () => {
-      var ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/ws`, PROTOCOL)
-      var conn
-      ws.onmessage = async ({ data }) => {
-        if (!conn) {
-          conn = new RTCPeerConnection()
-          conn.onicecandidate = ({ candidate }) => candidate && ws.send(JSON.stringify(candidate))
-          conn.ondatachannel = ({ channel }) => dataChannelHandler(channel)
-          dataChannelHandler(conn.createDataChannel(PROTOCOL))
-          conn.ontrack = ({ streams }) => ($('stream').srcObject = streams[0])
-        }
-        const msg = JSON.parse(data)
-        if (msg.type) {
-          await conn.setRemoteDescription(msg)
-          const answer = await conn.createAnswer()
-          await conn.setLocalDescription(answer)
-          console.log(preferredVideoCodecs())
-          const [audioTransceiver, videoTransceiver] = conn.getTransceivers()
-          if (videoTransceiver) {
-            videoTransceiver.setCodecPreferences(preferredVideoCodecs())
+      window.onload = () => {
+        var ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/ws`, PROTOCOL)
+        var conn
+        ws.onmessage = async ({ data }) => {
+          if (!conn) {
+            conn = new RTCPeerConnection()
+            conn.onicecandidate = ({ candidate }) => candidate && ws.send(JSON.stringify(candidate))
+            conn.ondatachannel = ({ channel }) => dataChannelHandler(channel)
+            dataChannelHandler(conn.createDataChannel(PROTOCOL))
+            conn.ontrack = ({ streams }) => ($('stream').srcObject = streams[0])
           }
-          ws.send(JSON.stringify(answer))
-        } else {
-          await conn.addIceCandidate(msg)
+          const msg = JSON.parse(data)
+          if (msg.type) {
+            await conn.setRemoteDescription(msg)
+            const answer = await conn.createAnswer()
+            await conn.setLocalDescription(answer)
+            console.log(preferredVideoCodecs())
+            const [audioTransceiver, videoTransceiver] = conn.getTransceivers()
+            if (videoTransceiver) {
+              videoTransceiver.setCodecPreferences(preferredVideoCodecs())
+            }
+            ws.send(JSON.stringify(answer))
+          } else {
+            await conn.addIceCandidate(msg)
+          }
+        }
+        $('fullscreen-btn').addEventListener('click', () => {
+          if (d.requestFullscreen) {
+            d.requestFullscreen()
+          } else if (d.webkitRequestFullscreen) {
+            d.webkitRequestFullscreen()
+          }
+        })
+      }
+    </script>
+    <style>
+      video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .container {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .overlay {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.5);
+        color: white;
+        padding: 10px;
+        font-size: 18px;
+        border-radius: 5px;
+      }
+
+      .footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: rgba(51, 51, 51, 0.5);
+        color: white;
+        text-align: center;
+        padding: 10px;
+      }
+
+      .overlay-gps {
+        position: absolute;
+        top: 0;
+        right: 0;
+        padding: 10px;
+        font-size: 18px;
+        color: white;
+        background: rgba(0, 0, 0, 0.3);
+        /* 背景を半透明（透明にしたいなら transparent に変更） */
+        border-radius: 0 0 0 10px;
+        /* 左下の角を丸くする */
+      }
+
+      .hud {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 200px;
+        height: 200px;
+        border: 2px solid rgba(0, 255, 0, 0.7);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .crosshair {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+      }
+
+      .crosshair::before,
+      .crosshair::after {
+        content: '';
+        position: absolute;
+        background: rgba(0, 255, 0, 0.7);
+      }
+
+      /* 縦ライン */
+      .crosshair::before {
+        width: 2px;
+        height: 100%;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      /* 横ライン */
+      .crosshair::after {
+        width: 100%;
+        height: 2px;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+
+      /* コンパス全体 */
+      .compass {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 300px;
+        height: 50px;
+        overflow: hidden;
+        border: 2px solid rgba(0, 255, 0, 0.7);
+        border-radius: 5px;
+        background: rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* コンパスの目盛り */
+      .compass-scale {
+        display: flex;
+        position: relative;
+        white-space: nowrap;
+        font-family: Arial, sans-serif;
+        font-size: 18px;
+        color: rgba(0, 255, 0, 0.8);
+        animation: moveCompass 10s linear infinite;
+        /* 自動スクロール */
+      }
+
+      /* 方向の目盛り */
+      .compass-scale span {
+        display: inline-block;
+        width: 50px;
+        text-align: center;
+      }
+
+      /* 現在の方向を示す中央のインジケーター */
+      .indicator {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 22px;
+        font-weight: bold;
+        color: rgba(255, 255, 0, 0.9);
+      }
+
+      /* コンパスのアニメーション */
+      @keyframes moveCompass {
+        from {
+          transform: translateX(0);
+        }
+
+        to {
+          transform: translateX(-50px);
         }
       }
-      $('fullscreen-btn').addEventListener('click', () => {
-        if (d.requestFullscreen) {
-          d.requestFullscreen()
-        } else if (d.webkitRequestFullscreen) {
-          d.webkitRequestFullscreen()
-        }
-      })
-    }
-  </script>
-  <style>
-    video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+    </style>
+  </head>
 
-    .container {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-    }
-
-    .overlay {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(0, 0, 0, 0.5);
-      color: white;
-      padding: 10px;
-      font-size: 18px;
-      border-radius: 5px;
-    }
-
-    .footer {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      background: rgba(51, 51, 51, 0.5);
-      color: white;
-      text-align: center;
-      padding: 10px;
-    }
-
-    .overlay-gps {
-      position: absolute;
-      top: 0;
-      right: 0;
-      padding: 10px;
-      font-size: 18px;
-      color: white;
-      background: rgba(0, 0, 0, 0.3);
-      /* 背景を半透明（透明にしたいなら transparent に変更） */
-      border-radius: 0 0 0 10px;
-      /* 左下の角を丸くする */
-    }
-
-    .hud {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 200px;
-      height: 200px;
-      border: 2px solid rgba(0, 255, 0, 0.7);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .crosshair {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-    }
-
-    .crosshair::before,
-    .crosshair::after {
-      content: "";
-      position: absolute;
-      background: rgba(0, 255, 0, 0.7);
-    }
-
-    /* 縦ライン */
-    .crosshair::before {
-      width: 2px;
-      height: 100%;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-
-    /* 横ライン */
-    .crosshair::after {
-      width: 100%;
-      height: 2px;
-      left: 0;
-      top: 50%;
-      transform: translateY(-50%);
-    }
-
-    /* コンパス全体 */
-    .compass {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 300px;
-      height: 50px;
-      overflow: hidden;
-      border: 2px solid rgba(0, 255, 0, 0.7);
-      border-radius: 5px;
-      background: rgba(0, 0, 0, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* コンパスの目盛り */
-    .compass-scale {
-      display: flex;
-      position: relative;
-      white-space: nowrap;
-      font-family: Arial, sans-serif;
-      font-size: 18px;
-      color: rgba(0, 255, 0, 0.8);
-      animation: moveCompass 10s linear infinite;
-      /* 自動スクロール */
-    }
-
-    /* 方向の目盛り */
-    .compass-scale span {
-      display: inline-block;
-      width: 50px;
-      text-align: center;
-    }
-
-    /* 現在の方向を示す中央のインジケーター */
-    .indicator {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 22px;
-      font-weight: bold;
-      color: rgba(255, 255, 0, 0.9);
-    }
-
-    /* コンパスのアニメーション */
-    @keyframes moveCompass {
-      from {
-        transform: translateX(0);
-      }
-
-      to {
-        transform: translateX(-50px);
-      }
-    }
-  </style>
-</head>
-
-<body>
-  <div class="container">
-    <video id="stream" autoplay playsinline muted>Your browser does not support video</video>
-    <div class="overlay">xxx</div>
-    <div class="footer"><button id="fullscreen-btn">Go Fullscreen</button></div>
-    <div class="overlay-gps">gps</div>
-    <div class="compass">
-      <div class="compass-scale">
-        <span>W</span><span>NW</span><span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span><span>SW</span><span>W</span>
+  <body>
+    <div class="container">
+      <video id="stream" autoplay playsinline muted>Your browser does not support video</video>
+      <div class="overlay">xxx</div>
+      <div class="footer"><button id="fullscreen-btn">Go Fullscreen</button></div>
+      <div class="overlay-gps">gps</div>
+      <div class="compass">
+        <div class="compass-scale"><span>W</span><span>NW</span><span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span><span>SW</span><span>W</span></div>
+        <div class="indicator">▲</div>
+        <!-- 現在の方向マーカー -->
       </div>
-      <div class="indicator">▲</div> <!-- 現在の方向マーカー -->
+      <div class="hud">
+        <div class="crosshair"></div>
+      </div>
     </div>
-    <div class="hud">
-      <div class="crosshair"></div>
-    </div>
-  </div>
-</body>
-
+  </body>
 </html>

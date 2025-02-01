@@ -1,45 +1,41 @@
 <html>
+  <head>
+    <script type="text/javascript">
+      const PROTOCOL = 'transceiver'
 
-<head>
-  <script type='text/javascript'>
-    const PROTOCOL = 'transceiver'
+      const dataChannel = {}
+      const dataChannelHandler = (channel) => {
+        channel.onopen = ({ target }) => (dataChannel[target.label] = target)
+        channel.onmessage = ({ data }) => console.log(channel.label + '.OnMessage', data)
+      }
 
-    const dataChannel = {}
-    const dataChannelHandler = (channel) => {
-      channel.onopen = ({ target }) => dataChannel[target.label] = target
-      channel.onmessage = ({ data }) => console.log(channel.label + '.OnMessage', data)
-    }
-
-    // setInterval(async () => {
-    //   dataChannel[PROTOCOL].send(PROTOCOL)
-    // }, 1000)
-
-    window.onload = async () => {
-      var ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/ws`, PROTOCOL)
-      var conn = new RTCPeerConnection()
-      conn.onicecandidate = ({ candidate }) => candidate && ws.send(JSON.stringify(candidate))
-      conn.ondatachannel = ({ channel }) => dataChannelHandler(channel)
-      dataChannelHandler(conn.createDataChannel(PROTOCOL))
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      stream.getTracks().forEach(track => {
-        conn.addTrack(track, stream);
-      })
-      const offer = await conn.createOffer()
-      await conn.setLocalDescription(offer)
-      ws.send(JSON.stringify(offer))
-      ws.onmessage = async ({ data }) => {
-        const msg = JSON.parse(data)
-        if (msg.type) {
-          await conn.setRemoteDescription(msg)
-        } else {
-          await conn.addIceCandidate(msg)
+      window.onload = async () => {
+        var ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/ws`, PROTOCOL)
+        var conn = new RTCPeerConnection()
+        conn.onicecandidate = ({ candidate }) => candidate && ws.send(JSON.stringify(candidate))
+        conn.ondatachannel = ({ channel }) => dataChannelHandler(channel)
+        dataChannelHandler(conn.createDataChannel(PROTOCOL))
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        stream.getTracks().forEach((track) => {
+          conn.addTrack(track, stream)
+        })
+        conn.getTransceivers().forEach((transceiver) => {
+          transceiver.direction = 'sendonly'
+        })
+        const offer = await conn.createOffer()
+        await conn.setLocalDescription(offer)
+        ws.send(JSON.stringify(offer))
+        ws.onmessage = async ({ data }) => {
+          const msg = JSON.parse(data)
+          if (msg.type) {
+            await conn.setRemoteDescription(msg)
+          } else {
+            await conn.addIceCandidate(msg)
+          }
         }
       }
-    }
-  </script>
-</head>
+    </script>
+  </head>
 
-<body>
-</body>
-
+  <body></body>
 </html>
