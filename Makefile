@@ -6,7 +6,7 @@ else
 endif
 CFLAGS	:= -O0 -ggdb -Wall -fno-omit-frame-pointer
 
-all: clean webrtc-unidirectional-h264 webrtc-recvonly-h264 webrtc-sendrecv
+all: clean webrtc-unidirectional-h264 webrtc-recvonly-h264 webrtc-sendrecv webrtc-soup
 
 webrtc-unidirectional-h264: webrtc-unidirectional-h264.c webrtc-common.c
 	"$(CC)" $(CFLAGS) $^ $(LIBS) -o $@
@@ -17,6 +17,9 @@ webrtc-recvonly-h264: webrtc-recvonly-h264.c webrtc-common.c
 webrtc-sendrecv: webrtc-sendrecv.c custom_agent.c
 	"$(CC)" $(CFLAGS) $^ $(LIBS) -o $@
 
+webrtc-soup: webrtc-soup.c
+	"$(CC)" $(CFLAGS) $^ $(LIBS) -o $@
+
 clean:
 	rm -f webrtc-unidirectional-h264
 	rm -rf webrtc-unidirectional-h264.dSYM
@@ -24,6 +27,8 @@ clean:
 	rm -rf webrtc-recvonly-h264.dSYM
 	rm -f webrtc-sendrecv
 	rm -rf webrtc-sendrecv.dSYM
+	rm -f webrtc-soup
+	rm -rf webrtc-soup.dSYM
 
 fmt:
 	find . -name '*.h' -o -name '*.c' | xargs clang-format -i

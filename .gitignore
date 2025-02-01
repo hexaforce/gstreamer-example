@@ -1,4 +1,5 @@
 *.dSYM/
+webrtc-soup
 webrtc-sendrecv
 webrtc-unidirectional-h264
 webrtc-recvonly-h264
